@@ -1,4 +1,5 @@
 import random
+import collections
 
 import pyglet as pg
 import pymunk as pm
@@ -7,6 +8,28 @@ from constants import *
 import fruit, sprites, walls, gui
 from fruit import Fruit
 
+
+SPEEDMETER_BUFSIZE = 200
+class Speedmeter(object):
+    def __init__(self):
+        self._history = collections.deque( [0] * SPEEDMETER_BUFSIZE, maxlen=SPEEDMETER_BUFSIZE )
+        self.value = 0.0
+        self._ticks = 0
+
+
+    def tick_rel(self, dt):
+        self._ticks += 1
+        self._history.append(dt)
+        # self._history.pop()    # inutile avec maxlen
+        if( (self._ticks % 20)==0 ):
+            self.value = len(self._history) / sum(self._history)
+
+
+    def tick_abs(self, new_val ):
+        raise NotImplementedError
+        self._ticks += 1
+        prev_val = self._history[-1]
+        self._history.append( new_val-prev_val)
 
 
 class CountDown(object):
@@ -68,6 +91,7 @@ class SuikaWindow(pg.window.Window):
         pg.clock.schedule_interval( self.update, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
         self.fps_display = pg.window.FPSDisplay(self)
+        self.pymunk_speedmeter = Speedmeter()
 
 
     def reset_game(self):
@@ -193,6 +217,7 @@ class SuikaWindow(pg.window.Window):
     def update(self, dt):
         """Avance d'un pas la simulation physique
         """
+        self.pymunk_speedmeter.tick_rel(dt)
         if( self._is_paused or self._is_gameover ):
             return
 
@@ -226,7 +251,8 @@ class SuikaWindow(pg.window.Window):
         # met à jour l'affichage et détecte la fin de partie
         gameover, countdown_txt = self._countdown.status()
         self._labels.update( gui.TOP_LEFT, f"fruits {len(self._fruits)}" )
-        self._labels.update( gui.TOP_RIGHT, f"score {self._score}" )
+        #self._labels.update( gui.TOP_RIGHT, f"score {self._score}" )
+        self._labels.update( gui.TOP_RIGHT, f"FPS {self.pymunk_speedmeter.value:.0f}" )
         self._labels.update( gui.TOP_CENTER, countdown_txt )
 
         if( gameover or self._is_gameover ):
