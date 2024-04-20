@@ -40,7 +40,7 @@ class MaxLineSprite( pg.shapes.Line ):
         self.__delete__()
 
 
-class FruitSprite( pg.sprite.Sprite ):
+class FruitSprite( SuikaSprite ):
     #def _make_sprite(self, nom, radius):
     def __init__(self, nom, radius):
         """  sprite pyglet associé à l'objet physique
@@ -51,18 +51,15 @@ class FruitSprite( pg.sprite.Sprite ):
         super().__init__(img=img, 
                          batch=batch(), 
                          group=group(SPRITE_GROUP_FRUITS) )
-        super().update( scale_x= 2 * radius / img.width, 
+        pg.sprite.Sprite.update( self, scale_x= 2 * radius / img.width, 
                         scale_y= 2 * radius / img.height )
-
         self.set_effet( EFFET_VISIBLE )
 
 
     def set_effet( self, effet):
-
         self._effect_start_time = None
         self._opacity_ref = 255
         self._effect = effet
-
         if(effet == EFFET_VISIBLE):
             pass
         elif(effet== EFFET_BLINK ):
@@ -77,16 +74,22 @@ class FruitSprite( pg.sprite.Sprite ):
             print(f"warning: effet {effet} inconnu")
 
 
-    def update(self, x, y, rotation):
-        self.x=x
-        self.y=y
-        self.rotation=rotation
-        self.opacity = self._opacity_ref
+class SuikaSprite ( pg.sprite.Sprite ):
+    
+    def update(self, x, y, rotation ):
+        self.update_sprite(x, y, rotation)
+        self.update_animations()
 
+
+    def update_sprite(self, x, y, rotation):
+        pg.sprite.Sprite.update( self, x=x, y=y, rotation=rotation )
+        self.opacity = self._opacity_ref # peut être modifié par les animations
+
+
+    def update_animations(self):
         # animations
         if( self._effect_start_time ):
             assert( self._effect in [EFFET_BLINK, EFFET_FADEOUT] )
-
             t =  pg.clock.get_default().time() - self._effect_start_time
 
             # clignotement des fruit (5 Hz), inhibé avant DELAI_CLIGNOTEMENT
@@ -127,8 +130,15 @@ EXPLO_CENTRES = ligne1+ligne2
 EXPLO_SIZE = 256
 EXPLO_PNG = "explosion.png"
 
-class ExplosionSprite( pg.sprite.Sprite ):
-    def __init__(self, radius, on_explosion_end):
+class ExplosionSprite( SuikaSprite ):
+    def __init__(self, r, on_explosion_end):
+        # setup callback
+        self._on_explosion_end = on_explosion_end
+        # build actual sprite
+        self._make_animated_sprite(r)
+
+
+    def _make_animation(self):
         img = pg.resource.image("explosion.png")
         seq = []
         for (x,y) in EXPLO_CENTRES:
@@ -137,20 +147,22 @@ class ExplosionSprite( pg.sprite.Sprite ):
             region.anchor_x = EXPLO_SIZE//2
             region.anchor_y = EXPLO_SIZE//2
             seq.append(region)
-        explo_animation  = pg.image.Animation.from_image_sequence( 
+        return pg.image.Animation.from_image_sequence( 
             sequence=seq, 
             loop=False,
             duration=DELAI_FADEOUT / len(seq))
-        super().__init__(img=explo_animation, 
+    
+
+    def _make_animated_sprite(self, r):
+        super().__init__(img=self._make_animation(),
                          batch = batch(),
                          group=group(SPRITE_GROUP_EXPLOSIONS))
 
-        scale = 2.5 * radius / EXPLO_SIZE
-        self.update( scale=scale )
+        scale = 2.5 * r / EXPLO_SIZE
+        self.scale=scale 
         self.opacity=192
-        self._on_explosion_end = on_explosion_end
 
-
+    # Event envoyé par pyglet automatiquement
     def on_animation_end(self):
         # renvoie l'envènement à l'objet parent Fruit
         self._on_explosion_end()

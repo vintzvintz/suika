@@ -132,7 +132,7 @@ class Fruit( object ):
             print( f"WARNING: {self} delete() avec mode différent de MODE_REMOVED" )
         # remove pymunk objects and local references
         if( self._body or self._shape):
-            print( f"{self}.delete()")
+            #print( f"{self}.delete()")
             self._space.remove( self._body, self._shape )
             self._body = self._shape = None
         
@@ -259,7 +259,7 @@ class Fruit( object ):
     def explose(self):
         self._set_mode(MODE_EXPLOSE)
         sprite = sprites.ExplosionSprite( 
-            radius=self._shape.radius, 
+            r=self._shape.radius, 
             on_explosion_end=self.on_explosition_end)
         sprite.position = ( *self._body.position, 0)
         self._sprite_explosion = sprite
