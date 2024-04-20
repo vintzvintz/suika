@@ -98,7 +98,7 @@ class Fruit( object ):
     def __init__(self, space, kind=0, position=None):
         _new_fruit()
         # espece aléatoire si non spécifiée
-        assert kind< nb_fruits(), "type de balle invalide"
+        assert kind<=nb_fruits(), "type de balle invalide"
         if( kind<=0 ):
             kind = random.randint(1,4)   
         fruit_def = _FRUITS_DEF[kind]
@@ -148,7 +148,7 @@ class Fruit( object ):
 
     def __del__(self):
         _del_fruit()
-        print( f"__del__({self})")
+        #print( f"__del__({self})")
         self._delete()
 
 
@@ -182,7 +182,7 @@ class Fruit( object ):
             and self._sprite_explosion==None)
 
     def _set_mode(self, value):
-        print( f"{self}._setmode({value})")
+        # print( f"{self}._setmode({value})")
         self._fruit_mode = value
         mode = _FRUIT_MODES[value]
         self._sprite.set_effet( mode[EFFET] )
@@ -271,7 +271,7 @@ class Fruit( object ):
         return   (x < 0) or (y < 0) or (x>WINDOW_WIDTH) or (y>WINDOW_HEIGHT)
     
     def on_explosition_end(self):
-        print( f"{self} on_explosion_end()")
+        #print( f"{self} on_explosion_end()")
         self._set_mode(MODE_REMOVED)
         self._delete()
 

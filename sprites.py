@@ -137,13 +137,17 @@ class ExplosionSprite( pg.sprite.Sprite ):
             region.anchor_x = EXPLO_SIZE//2
             region.anchor_y = EXPLO_SIZE//2
             seq.append(region)
-        explo_animation  = pg.image.Animation.from_image_sequence( sequence=seq, duration=0.05, loop=False )
+        explo_animation  = pg.image.Animation.from_image_sequence( 
+            sequence=seq, 
+            loop=False,
+            duration=DELAI_FADEOUT / len(seq))
         super().__init__(img=explo_animation, 
                          batch = batch(),
                          group=group(SPRITE_GROUP_EXPLOSIONS))
 
-        scale = 2 * radius / EXPLO_SIZE
+        scale = 2.5 * radius / EXPLO_SIZE
         self.update( scale=scale )
+        self.opacity=192
         self._on_explosion_end = on_explosion_end
 
 
