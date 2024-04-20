@@ -5,7 +5,7 @@ import pymunk as pm
 
 from constants import *
 import sprites
-from sprites import EFFET_VISIBLE, EFFET_HIDDEN, EFFET_BLINK, EFFET_FADEOUT, EFFET_GAMEOVER
+from sprites import EFFET_AUCUN, EFFET_HIDDEN, EFFET_BLINK, EFFET_FADEOUT, EFFET_GAMEOVER, EFFET_FADEIN
 
 
 _FRUITS_DEF = [
@@ -29,47 +29,60 @@ def nb_fruits():
     return len(_FRUITS_DEF) - 1
 
 MODE_WAIT = 'wait'
-MODE_FALL = 'fall'
+MODE_FADEIN = 'fadein'
+MODE_NORMAL = 'normal'
 MODE_DEBORDE = 'deborde'
 MODE_EXPLOSE = 'explose'
-MODE_REMOVED = 'removed'
 MODE_GAMEOVER = 'gameover'
+MODE_REMOVED = 'removed'
 
 COLLISION_CAT = 'coll_cat'
 COLLISION_MASK = 'coll_mask'
-
+BODY_TYPE = 'body_type'
 EFFET = 'effect'
 
 _FRUIT_MODES = {
     MODE_WAIT: {
         COLLISION_CAT: CAT_FRUIT_WAIT,
         COLLISION_MASK: 0x00, # collision avec les murs uniqement
-        EFFET: EFFET_VISIBLE,
+        EFFET: EFFET_AUCUN,
+        BODY_TYPE: pm.Body.KINEMATIC
     },
-    MODE_FALL: {
-        COLLISION_CAT: CAT_FRUIT_FALL,
-        COLLISION_MASK: CAT_FRUIT_FALL | CAT_MAXLINE,
-        EFFET: EFFET_VISIBLE ,
+    MODE_FADEIN: {
+        COLLISION_CAT: CAT_FRUIT,
+        COLLISION_MASK: CAT_FRUIT | CAT_MAXLINE,
+        EFFET: EFFET_FADEIN,
+        BODY_TYPE: pm.Body.DYNAMIC
+    },
+    MODE_NORMAL: {
+        COLLISION_CAT: CAT_FRUIT,
+        COLLISION_MASK: CAT_FRUIT | CAT_MAXLINE,
+        EFFET: EFFET_AUCUN ,
+        BODY_TYPE: pm.Body.DYNAMIC
     },
     MODE_DEBORDE: {
-        COLLISION_CAT: CAT_FRUIT_FALL,
-        COLLISION_MASK: CAT_FRUIT_FALL | CAT_MAXLINE,
+        COLLISION_CAT: CAT_FRUIT,
+        COLLISION_MASK: CAT_FRUIT | CAT_MAXLINE,
         EFFET: EFFET_BLINK,
+        BODY_TYPE: pm.Body.DYNAMIC
     },
     MODE_GAMEOVER: {
-        COLLISION_CAT: CAT_FRUIT_FALL,
-        COLLISION_MASK: CAT_FRUIT_FALL,
-        EFFET: EFFET_GAMEOVER ,
+        COLLISION_CAT: CAT_FRUIT,
+        COLLISION_MASK: CAT_FRUIT,
+        EFFET: EFFET_GAMEOVER,
+        BODY_TYPE: pm.Body.KINEMATIC
     },
     MODE_EXPLOSE: {
         COLLISION_CAT: CAT_FRUIT_EXPLOSE,
         COLLISION_MASK: 0x00,   # collision avec les murs uniqement
         EFFET:  EFFET_FADEOUT,
+        BODY_TYPE: pm.Body.KINEMATIC
     },
     MODE_REMOVED: {
         COLLISION_CAT: CAT_FRUIT_REMOVED,
         COLLISION_MASK: 0x00,   # collision avec les murs uniqement
-        EFFET: EFFET_HIDDEN ,
+        EFFET: EFFET_HIDDEN,
+        BODY_TYPE: pm.Body.KINEMATIC
     }
 }
 
@@ -121,7 +134,7 @@ class Fruit( object ):
 
         self._sprite = sprites.FruitSprite( 
             nom=fruit_def['name'], 
-            radius=fruit_def['radius'] )
+            r=fruit_def['radius'] )
         self._sprite_explosion = None
         self._set_mode( MODE_WAIT )
 
@@ -185,8 +198,9 @@ class Fruit( object ):
         # print( f"{self}._setmode({value})")
         self._fruit_mode = value
         mode = _FRUIT_MODES[value]
+
+        self._body.body_type = mode[BODY_TYPE]
         self._sprite.set_effet( mode[EFFET] )
-        
         # modifie les règkes de collision
         self._shape.filter = pm.ShapeFilter(
             categories= mode[COLLISION_CAT],
@@ -216,7 +230,7 @@ class Fruit( object ):
                      kind=kind,
                      position = self._body.position)
         if( drop ):
-            fruit.drop()   # pour passer en mode Body.DYNAMIC
+            fruit.fade_in()   # pour passer en mode Body.DYNAMIC
         return fruit
 
 
@@ -244,14 +258,21 @@ class Fruit( object ):
         assert( self._body.body_type == pm.Body.KINEMATIC )
         self._body.body_type = pm.Body.DYNAMIC
         assert not (self._kind is None)
-        self._set_mode( MODE_FALL )
+        self._set_mode( MODE_NORMAL )
+
+    def fade_in(self):
+        """ fait apparaitre le sprite avec un effet d'agrandissement et de transparence
+        """
+        assert( self._body.body_type == pm.Body.KINEMATIC )
+        self._body.body_type = pm.Body.DYNAMIC
+        self._set_mode( MODE_FADEIN )
 
     def set_deborde(self, val):
         """Mode débordement -> clignote"""
         if(val):
             self._set_mode(MODE_DEBORDE)
         else:
-            self._set_mode(MODE_FALL)
+            self._set_mode(MODE_NORMAL)
 
     def gameover(self):
         self._set_mode(MODE_GAMEOVER)
@@ -260,7 +281,7 @@ class Fruit( object ):
         self._set_mode(MODE_EXPLOSE)
         sprite = sprites.ExplosionSprite( 
             r=self._shape.radius, 
-            on_explosion_end=self.on_explosition_end)
+            on_explosion_end=self.remove)
         sprite.position = ( *self._body.position, 0)
         self._sprite_explosion = sprite
 
@@ -270,8 +291,8 @@ class Fruit( object ):
         x, y = self._body.position
         return   (x < 0) or (y < 0) or (x>WINDOW_WIDTH) or (y>WINDOW_HEIGHT)
     
-    def on_explosition_end(self):
-        #print( f"{self} on_explosion_end()")
+    # retire le fruit du jeu. l'objet ne doit plus être utilisé ensuite.
+    def remove(self):
         self._set_mode(MODE_REMOVED)
         self._delete()
 

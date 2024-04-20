@@ -4,10 +4,11 @@ from constants import *
 
 pg.resource.path = ['assets/']
 
-EFFET_VISIBLE = 'visible'
+EFFET_AUCUN = 'aucun'
 EFFET_BLINK = 'blink'
-EFFET_FADEOUT = 'fadeout'
-EFFET_GAMEOVER = 'gameover'
+EFFET_FADEIN = 'fade_in'
+EFFET_FADEOUT = 'fade_out'
+EFFET_GAMEOVER = 'game_over'
 EFFET_HIDDEN = 'hidden'
 
 
@@ -37,35 +38,78 @@ class MaxLineSprite( pg.shapes.Line ):
             group=group(SPRITE_GROUP_GUI) )
         
     def __del__(self):
-        self.__delete__()
+        pg.shapes.Line.delete()
 
 
-class FruitSprite( SuikaSprite ):
-    #def _make_sprite(self, nom, radius):
-    def __init__(self, nom, radius):
-        """  sprite pyglet associé à l'objet physique
-        """
-        img = pg.resource.image( f"{nom}.png" )
-        img.anchor_x = img.width // 2                 # ancrage au centre de l'image
-        img.anchor_y = img.height // 2
-        super().__init__(img=img, 
-                         batch=batch(), 
-                         group=group(SPRITE_GROUP_FRUITS) )
-        pg.sprite.Sprite.update( self, scale_x= 2 * radius / img.width, 
-                        scale_y= 2 * radius / img.height )
-        self.set_effet( EFFET_VISIBLE )
+class SuikaSprite ( pg.sprite.Sprite ):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._animation_start_time = None
+        self._on_animation_stop = lambda : None
+        self.set_effet(EFFET_AUCUN)
+
+    def _stop_animation(self):
+        if( self._on_animation_stop ):
+            self._on_animation_stop
+        self._on_animation_stop = lambda : None
+        self._animation_start_time = None
+
+    def _start_animation(self, on_stop):
+        self._on_stop = on_stop
+        self._animation_start_time = pg.clock.get_default().time()
+
+    # intercepte l'update du pyglet.spite.Sprite pour traiter les animations
+    def update(self, x, y, rotation):
+        self.update_sprite(x, y, rotation)
+        self.update_animation()
 
 
-    def set_effet( self, effet):
+    def update_sprite(self, x, y, rotation):
+        # peuvent être modifiés par les animations ensuite
+        pg.sprite.Sprite.update( self, x=x, y=y, rotation=rotation,
+                                 scale_x=self._scale_ref[0],
+                                 scale_y=self._scale_ref[1] )
+        self.opacity = self._opacity_ref 
+
+    def update_animation(self ):
+        # animations
+        if( self._animation_start_time ):
+            t =  pg.clock.get_default().time() - self._animation_start_time
+
+            # apparition avec effet de taille et transparence
+            if( self._effect == EFFET_FADEIN ):
+                ratio_size = min(1, ( t * (1-SIZESTART_FADEIN)/DELAI_FADEIN + SIZESTART_FADEIN ))
+                self.scale_x = self._scale_ref[0] * ratio_size
+                self.scale_y = self._scale_ref[1] * ratio_size
+                if( ratio_size >= 1.20 ):
+                    self._stop_animation()
+    
+            # clignotement des fruit (5 Hz), temporisé de DELAI_CLIGNOTEMENT
+            elif( self._effect == EFFET_BLINK ):
+                t_blink = int(max( 0, 5*256*(t-DELAI_CLIGNOTEMENT) )) % 256
+                self.opacity = 127 + abs(t_blink-128)
+
+            # fadeout
+            elif( self._effect == EFFET_FADEOUT ):
+                opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
+                if( opacity <= 0 ):
+                    self._stop_animation()
+                self.opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
+            # fallback
+            else:
+                print( f"ERREUR: timer d'animation inutilisé avec {self._effect}" )
+
+
+    def set_effet( self, effet, on_stop=None ):
         self._effect_start_time = None
         self._opacity_ref = 255
         self._effect = effet
-        if(effet == EFFET_VISIBLE):
-            pass
-        elif(effet== EFFET_BLINK ):
-            self._effect_start_time = pg.clock.get_default().time()
-        elif(effet== EFFET_FADEOUT):
-            self._effect_start_time = pg.clock.get_default().time()
+
+        if (effet in [EFFET_FADEIN, EFFET_BLINK, EFFET_FADEOUT] ):
+            self._start_animation( on_stop=on_stop)
+        elif(effet == EFFET_AUCUN):
+            self._stop_animation()
         elif(effet== EFFET_GAMEOVER):
             self._opacity_ref = 64
         elif(effet== EFFET_HIDDEN):
@@ -74,35 +118,17 @@ class FruitSprite( SuikaSprite ):
             print(f"warning: effet {effet} inconnu")
 
 
-class SuikaSprite ( pg.sprite.Sprite ):
-    
-    def update(self, x, y, rotation ):
-        self.update_sprite(x, y, rotation)
-        self.update_animations()
+class FruitSprite( SuikaSprite ):
+    #def _make_sprite(self, nom, radius):
+    def __init__(self, nom, r):
+        """  sprite pyglet associé à l'objet physique
+        """
+        img = pg.resource.image( f"{nom}.png" )
+        img.anchor_x = img.width // 2                 # ancrage au centre de l'image
+        img.anchor_y = img.height // 2
+        self._scale_ref = (2 * r / img.width,  2 * r / img.height)
 
-
-    def update_sprite(self, x, y, rotation):
-        pg.sprite.Sprite.update( self, x=x, y=y, rotation=rotation )
-        self.opacity = self._opacity_ref # peut être modifié par les animations
-
-
-    def update_animations(self):
-        # animations
-        if( self._effect_start_time ):
-            assert( self._effect in [EFFET_BLINK, EFFET_FADEOUT] )
-            t =  pg.clock.get_default().time() - self._effect_start_time
-
-            # clignotement des fruit (5 Hz), inhibé avant DELAI_CLIGNOTEMENT
-            if( self._effect== EFFET_BLINK ):
-                t_blink = int(max( 0, 5*256*(t-DELAI_CLIGNOTEMENT) )) % 256
-                self.opacity = 127 + abs(t_blink-128)
-
-            # fadeout immediat
-            elif( self._effect== EFFET_FADEOUT ):
-                self.opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
-            else:
-                print( f"ERREUR: timer inutilement présent avec effet {self._effect}")
-
+        super().__init__(img=img, batch=batch(), group=group(SPRITE_GROUP_FRUITS),   )
 
 
 ## Explosion
@@ -136,7 +162,8 @@ class ExplosionSprite( SuikaSprite ):
         self._on_explosion_end = on_explosion_end
         # build actual sprite
         self._make_animated_sprite(r)
-
+        scale = 2.5 * r / EXPLO_SIZE
+        self._scale_ref = ( scale, scale )
 
     def _make_animation(self):
         img = pg.resource.image("explosion.png")
@@ -157,10 +184,7 @@ class ExplosionSprite( SuikaSprite ):
         super().__init__(img=self._make_animation(),
                          batch = batch(),
                          group=group(SPRITE_GROUP_EXPLOSIONS))
-
-        scale = 2.5 * r / EXPLO_SIZE
-        self.scale=scale 
-        self.opacity=192
+        self.opacity=128
 
     # Event envoyé par pyglet automatiquement
     def on_animation_end(self):
