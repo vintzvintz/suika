@@ -10,7 +10,7 @@ EFFET_FADEIN = 'fade_in'
 EFFET_FADEOUT = 'fade_out'
 EFFET_GAMEOVER = 'game_over'
 EFFET_HIDDEN = 'hidden'
-
+EFFET_ANIMATIONS = [EFFET_BLINK, EFFET_FADEIN, EFFET_FADEOUT ]
 
 _groups = {
     SPRITE_GROUP_FOND : pg.graphics.Group( order = 0 ),
@@ -46,24 +46,15 @@ class SuikaSprite ( pg.sprite.Sprite ):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._animation_start_time = None
-        self._on_animation_stop = lambda : None
-        self.set_effet(EFFET_AUCUN)
-
-    def _stop_animation(self):
-        if( self._on_animation_stop ):
-            self._on_animation_stop
-        self._on_animation_stop = lambda : None
-        self._animation_start_time = None
-
-    def _start_animation(self, on_stop):
-        self._on_stop = on_stop
-        self._animation_start_time = pg.clock.get_default().time()
+        self._on_animation_stop = None
+        self.update_effet(EFFET_AUCUN)
 
     # intercepte l'update du pyglet.spite.Sprite pour traiter les animations
-    def update(self, x, y, rotation):
+    def update(self, x, y, rotation, effet, animation_time, on_animation_stop):
         self.update_sprite(x, y, rotation)
-        self.update_animation()
-
+        self.update_effet(effet)
+        if( effet in EFFET_ANIMATIONS ):
+            return self.update_animation(effet, animation_time, on_animation_stop)
 
     def update_sprite(self, x, y, rotation):
         # peuvent être modifiés par les animations ensuite
@@ -72,44 +63,37 @@ class SuikaSprite ( pg.sprite.Sprite ):
                                  scale_y=self._scale_ref[1] )
         self.opacity = self._opacity_ref 
 
-    def update_animation(self ):
-        # animations
-        if( self._animation_start_time ):
-            t =  pg.clock.get_default().time() - self._animation_start_time
+    def update_animation(self, effet, animation_time, on_animation_stop):
+        """ t = animation_time (sec)"""
+        t =  animation_time
 
-            # apparition avec effet de taille et transparence
-            if( self._effect == EFFET_FADEIN ):
-                ratio_size = min(1, ( t * (1-SIZESTART_FADEIN)/DELAI_FADEIN + SIZESTART_FADEIN ))
-                self.scale_x = self._scale_ref[0] * ratio_size
-                self.scale_y = self._scale_ref[1] * ratio_size
-                if( ratio_size >= 1.20 ):
-                    self._stop_animation()
-    
-            # clignotement des fruit (5 Hz), temporisé de DELAI_CLIGNOTEMENT
-            elif( self._effect == EFFET_BLINK ):
-                t_blink = int(max( 0, 5*256*(t-DELAI_CLIGNOTEMENT) )) % 256
-                self.opacity = 127 + abs(t_blink-128)
+        # apparition avec effet de taille et transparence
+        if( effet == EFFET_FADEIN ):
+            ratio_size = min(1, ( t * (1-SIZESTART_FADEIN)/DELAI_FADEIN + SIZESTART_FADEIN ))
+            self.scale_x = self._scale_ref[0] * ratio_size
+            self.scale_y = self._scale_ref[1] * ratio_size
+            if( ratio_size >= 1.20 ):
+                on_animation_stop()
 
-            # fadeout
-            elif( self._effect == EFFET_FADEOUT ):
-                opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
-                if( opacity <= 0 ):
-                    self._stop_animation()
-                self.opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
-            # fallback
-            else:
-                print( f"ERREUR: timer d'animation inutilisé avec {self._effect}" )
+        # clignotement des fruit (5 Hz), temporisé de DELAI_CLIGNOTEMENT
+        elif( effet == EFFET_BLINK ):
+            t_blink = int(max( 0, 5*256*(t-DELAI_CLIGNOTEMENT) )) % 256
+            self.opacity = 127 + abs(t_blink-128)
+
+        # fadeout
+        elif( effet == EFFET_FADEOUT ):
+            opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
+            if( opacity <= 0 ):
+                on_animation_stop()
+            self.opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
+        # fallback
+        else:
+            print( f"ERREUR: timer d'animation de sprite inutilisé avec effet '{self._effect}'" )
 
 
-    def set_effet( self, effet, on_stop=None ):
-        self._effect_start_time = None
-        self._opacity_ref = 255
-        self._effect = effet
-
-        if (effet in [EFFET_FADEIN, EFFET_BLINK, EFFET_FADEOUT] ):
-            self._start_animation( on_stop=on_stop)
-        elif(effet == EFFET_AUCUN):
-            self._stop_animation()
+    def update_effet( self, effet ):
+        if (effet == EFFET_AUCUN or effet in EFFET_ANIMATIONS ):
+            self._opacity_ref = 255
         elif(effet== EFFET_GAMEOVER):
             self._opacity_ref = 64
         elif(effet== EFFET_HIDDEN):

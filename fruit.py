@@ -5,7 +5,7 @@ import pymunk as pm
 
 from constants import *
 import sprites
-from sprites import EFFET_AUCUN, EFFET_HIDDEN, EFFET_BLINK, EFFET_FADEOUT, EFFET_GAMEOVER, EFFET_FADEIN
+from sprites import EFFET_AUCUN, EFFET_HIDDEN, EFFET_BLINK, EFFET_FADEOUT, EFFET_GAMEOVER, EFFET_FADEIN, EFFET_ANIMATIONS
 
 
 _FRUITS_DEF = [
@@ -135,6 +135,7 @@ class Fruit( object ):
         self._sprite = sprites.FruitSprite( 
             nom=fruit_def['name'], 
             r=fruit_def['radius'] )
+        self._sprite_effet = EFFET_AUCUN
         self._sprite_explosion = None
         self._set_mode( MODE_WAIT )
 
@@ -200,7 +201,12 @@ class Fruit( object ):
         mode = _FRUIT_MODES[value]
 
         self._body.body_type = mode[BODY_TYPE]
-        self._sprite.set_effet( mode[EFFET] )
+        self._sprite_effet = mode[EFFET]
+        if(self._sprite_effet in EFFET_ANIMATIONS):
+            self._start_animation()
+        else:
+            self._stop_animation()
+
         # modifie les règkes de collision
         self._shape.filter = pm.ShapeFilter(
             categories= mode[COLLISION_CAT],
@@ -241,7 +247,12 @@ class Fruit( object ):
             return
         (x, y) = self._body.position
         degres = -180/3.1416 * self._body.angle  # pymunk et pyglet ont un sens de rotation opposé
-        self._sprite.update( x=x, y=y, rotation=degres)
+        t = None
+        if( self._animation_start_time and self._sprite_effet in EFFET_ANIMATIONS ):
+            t = pg.clock.get_default().time() - self._animation_start_time
+        self._sprite.update( x=x, y=y, rotation=degres,
+                             effet=self._sprite_effet, 
+                             animation_time=t, on_animation_stop=self._on_animation_stop)
 
 
     def set_x(self, x):
@@ -255,16 +266,14 @@ class Fruit( object ):
 
     def drop(self):
         """met l'objet en mode dynamique pour qu'il tombe"""
-        assert( self._body.body_type == pm.Body.KINEMATIC )
-        self._body.body_type = pm.Body.DYNAMIC
         assert not (self._kind is None)
+        assert( self._body.body_type == pm.Body.KINEMATIC )
         self._set_mode( MODE_NORMAL )
 
     def fade_in(self):
         """ fait apparaitre le sprite avec un effet d'agrandissement et de transparence
         """
         assert( self._body.body_type == pm.Body.KINEMATIC )
-        self._body.body_type = pm.Body.DYNAMIC
         self._set_mode( MODE_FADEIN )
 
     def set_deborde(self, val):
@@ -295,6 +304,18 @@ class Fruit( object ):
     def remove(self):
         self._set_mode(MODE_REMOVED)
         self._delete()
+
+
+    def _on_animation_stop(self):
+        self._set_mode(MODE_NORMAL)
+        self._stop_animation()
+
+    def _stop_animation(self):
+        self._animation_start_time = None
+
+    def _start_animation(self):
+        if( not self._animation_start_time ):
+            self._animation_start_time = pg.clock.get_default().time()
 
 
 class CollisionResolver(object):
