@@ -38,7 +38,7 @@ class CountDown(object):
 
     def start(self):
         if( not self._start_time ):
-            self._start_time = pg.clock.get_default().time()
+                self._start_time = pg.clock.get_default().time()
 
     def reset(self):
         self._start_time = None
@@ -58,19 +58,10 @@ class CountDown(object):
             text = f"defaite dans {DELAI_DEBORDEMENT-t:.02f}s"
         return (etat, text)
     
+    def is_expired(self):
+        return ( self._start_time and  
+                (pg.clock.get_default().time() - self._start_time) > DELAI_DEBORDEMENT)
 
-def get_fruit_shape(arbiter):
-    # détecte le fruit et la maxline dans la collision
-
-    def is_fruit_shape(shape):
-        return shape.collision_type > 0 and shape.collision_type<=fruit.nb_fruits()
-
-    if( is_fruit_shape( arbiter.shapes[0]) ):
-        return arbiter.shapes[0]
-    elif ( is_fruit_shape( arbiter.shapes[1])):
-        return arbiter.shapes[1]
-    else:
-        raise RuntimeError( "Collision sans fruit")
 
 
 AUTOPLAY_FLOW = 1 + WINDOW_WIDTH // 750
@@ -85,11 +76,11 @@ class SuikaWindow(pg.window.Window):
         self._next_fruit = None
         self._countdown = CountDown()
         self._labels = gui.Labels( window_width=width, window_height=height )
-        self._collision_resolver = fruit.CollisionResolver(self._space)
-        self.setup_maxline_collision_handlers()
+        self._collision_helper = fruit.CollisionHelper(self._space)
         self.reset_game()
         pg.clock.schedule_interval( self.update, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
+        pg.clock.schedule_interval( self.cleanup_fruit_list, interval= 10*PYMUNK_INTERVAL )
         self.fps_display = pg.window.FPSDisplay(self)
         self.pymunk_speedmeter = Speedmeter()
 
@@ -99,7 +90,7 @@ class SuikaWindow(pg.window.Window):
         self._fruits = dict()
         self._score = 0
         self._is_gameover = False
-        self._collision_resolver.reset()
+        self._collision_helper.reset()
         self._countdown.reset()
         self._labels.reset()
         self._is_paused = False
@@ -107,31 +98,6 @@ class SuikaWindow(pg.window.Window):
         self._next_fruit = None
         self.add_next_fruit()
         self.fps_display = pg.window.FPSDisplay(self)
-
-
-    def setup_maxline_collision_handlers(self):
-        """ gere les collisions avec maxline
-        """
-        coll_handler = self._space.add_wildcard_collision_handler( COLLISION_TYPE_MAXLINE )
-        coll_handler.begin = lambda arbiter, space, data : self.collision_maxline_begin(arbiter)
-        coll_handler.separate = lambda arbiter, space, data : self.collision_maxline_separate(arbiter)
-
-
-    def collision_maxline_begin(self, arbiter):
-        id = get_fruit_shape(arbiter).fruit_id
-        # met le fruit en mode débordement
-        self._fruits[id].set_deborde(True)
-        # ignore la collision pour la simulation physique
-        return False   
-
-
-    def collision_maxline_separate(self, arbiter):
-        id = get_fruit_shape(arbiter).fruit_id
-        # annule le mode débordement et remet le fruit en mode normal
-        if( id in self._fruits.keys() ):
-            self._fruits[id].set_deborde(False)
-        # ignore la collision pour la simulation physique
-        return False  
 
 
     def add_next_fruit(self, dt=None):
@@ -146,14 +112,16 @@ class SuikaWindow(pg.window.Window):
         self._fruits[ self._next_fruit.id ] = self._next_fruit
 
 
-    def explose_fruit( self, id ):
-        self._fruits[id].explose()
-
-
     def remove_fruit_by_id( self, id ):
         if( id in self._fruits ):
             self._score += self._fruits[id].points
             del self._fruits[id]       # remove from list of active fruits
+
+
+    def cleanup_fruit_list(self, dt):
+        to_remove = [f.id for f in self._fruits.values() if f.removed]
+        for id in to_remove:
+            self.remove_fruit_by_id(id)
 
 
     def autoplay(self, dt):
@@ -162,7 +130,7 @@ class SuikaWindow(pg.window.Window):
         for i in range(AUTOPLAY_FLOW):
             f = Fruit( self._space, kind= random.randint(1,4)  )
             f.set_x( random.randint(0, WINDOW_WIDTH))
-            f.drop()
+            f.normal()
             self._fruits[f.id] = f
 
 
@@ -174,7 +142,6 @@ class SuikaWindow(pg.window.Window):
             self.remove_fruit_by_id( self._next_fruit.id )
             self._next_fruit = None
         for f in self._fruits.values():
-            f.blink = False
             f.gameover()
         self._labels.show_gameover()
 
@@ -196,24 +163,6 @@ class SuikaWindow(pg.window.Window):
             pass    # aucune erreur fatale avec les shoots de fruits
 
 
-    def traite_contacts(self):
-        """ fusionne et supprime les fruits en contact
-        """
-        created, to_remove = self._collision_resolver.resolve(self._fruits)
-        for f in created:
-             self._fruits[ f.id ] = f
-        for id in to_remove:
-            self.explose_fruit(id)
-
-
-    def retire_fruits(self):
-        """ Supprime les fruits retirés du jeu
-        """
-        ids_to_remove = [ id for (id, f) in self._fruits.items() if f.removed ]
-        for id in ids_to_remove:
-            self.remove_fruit_by_id( id )
-
-
     def update(self, dt):
         """Avance d'un pas la simulation physique
         """
@@ -222,20 +171,27 @@ class SuikaWindow(pg.window.Window):
             return
 
         # calcule les positions des objets
-        self._collision_resolver.reset()
+        self._collision_helper.reset()
         self._space.step( PYMUNK_INTERVAL )
 
+        # modifie les fruits selon les collisions détectées
+        self._collision_helper.process_collisions( self._fruits )
+
+        # # Supprime les fruits marqués pour suppression
+        # ids_to_remove = [ id for (id, f) in self._fruits.items() if f.removed ]
+        # for id in ids_to_remove:
+        #     self.remove_fruit_by_id( id )
+
+        # check
         offscreen = {f for f in self._fruits.values() if f.is_offscreen() }
         if( offscreen ):
             self.gameover()
             print( "WARNING balles en dehors du jeu !" )
 
-        self.traite_contacts()
-        self.retire_fruits()
 
 
     def on_draw(self):
-        assert fruit.active_count() == len(self._fruits), "Ressource leak"
+        assert fruit.active_count() - len(self._fruits) < 10 , "Ressource leak"
 
         # met a jour les positions des fruits 
         for f in self._fruits.values():
@@ -255,7 +211,7 @@ class SuikaWindow(pg.window.Window):
         self._labels.update( gui.TOP_RIGHT, f"FPS {self.pymunk_speedmeter.value:.0f}" )
         self._labels.update( gui.TOP_CENTER, countdown_txt )
 
-        if( gameover or self._is_gameover ):
+        if( gameover and not self._is_gameover ):
             self.gameover()
 
         # met à jour l'affichage
@@ -294,7 +250,7 @@ class SuikaWindow(pg.window.Window):
         # laĉhe le next_fruit
         if( (button & pg.window.mouse.LEFT) and self._next_fruit and not self._is_gameover ):
             self._next_fruit.set_x( x )
-            self._next_fruit.drop()
+            self._next_fruit.normal()
             self._next_fruit = None
             pg.clock.schedule_once( self.add_next_fruit, delay=0.5)
 

@@ -62,7 +62,7 @@ class Walls(object):
     def fruits_sur_maxline(self):
         """ Id des fruits en contact avec maxline
         """
-        ids = self._maxline.fruits_en_contact()
+        return self._maxline.fruits_en_contact()
     
 
     def __del__(self):

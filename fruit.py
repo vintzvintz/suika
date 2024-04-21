@@ -5,7 +5,7 @@ import pymunk as pm
 
 from constants import *
 import sprites
-from sprites import EFFET_AUCUN, EFFET_HIDDEN, EFFET_BLINK, EFFET_FADEOUT, EFFET_GAMEOVER, EFFET_FADEIN, EFFET_ANIMATIONS
+from sprites import VISI_NORMAL, VISI_GAMEOVER, VISI_HIDDEN
 
 
 _FRUITS_DEF = [
@@ -29,9 +29,7 @@ def nb_fruits():
     return len(_FRUITS_DEF) - 1
 
 MODE_WAIT = 'wait'
-MODE_FADEIN = 'fadein'
 MODE_NORMAL = 'normal'
-MODE_DEBORDE = 'deborde'
 MODE_EXPLOSE = 'explose'
 MODE_GAMEOVER = 'gameover'
 MODE_REMOVED = 'removed'
@@ -39,49 +37,37 @@ MODE_REMOVED = 'removed'
 COLLISION_CAT = 'coll_cat'
 COLLISION_MASK = 'coll_mask'
 BODY_TYPE = 'body_type'
-EFFET = 'effect'
+VISI = 'visi'
 
 _FRUIT_MODES = {
     MODE_WAIT: {
         COLLISION_CAT: CAT_FRUIT_WAIT,
         COLLISION_MASK: 0x00, # collision avec les murs uniqement
-        EFFET: EFFET_AUCUN,
+        VISI: VISI_NORMAL,
         BODY_TYPE: pm.Body.KINEMATIC
-    },
-    MODE_FADEIN: {
-        COLLISION_CAT: CAT_FRUIT,
-        COLLISION_MASK: CAT_FRUIT | CAT_MAXLINE,
-        EFFET: EFFET_FADEIN,
-        BODY_TYPE: pm.Body.DYNAMIC
     },
     MODE_NORMAL: {
         COLLISION_CAT: CAT_FRUIT,
         COLLISION_MASK: CAT_FRUIT | CAT_MAXLINE,
-        EFFET: EFFET_AUCUN ,
-        BODY_TYPE: pm.Body.DYNAMIC
-    },
-    MODE_DEBORDE: {
-        COLLISION_CAT: CAT_FRUIT,
-        COLLISION_MASK: CAT_FRUIT | CAT_MAXLINE,
-        EFFET: EFFET_BLINK,
+        VISI: VISI_NORMAL,
         BODY_TYPE: pm.Body.DYNAMIC
     },
     MODE_GAMEOVER: {
         COLLISION_CAT: CAT_FRUIT,
         COLLISION_MASK: CAT_FRUIT,
-        EFFET: EFFET_GAMEOVER,
+        VISI: VISI_GAMEOVER,
         BODY_TYPE: pm.Body.KINEMATIC
     },
     MODE_EXPLOSE: {
         COLLISION_CAT: CAT_FRUIT_EXPLOSE,
         COLLISION_MASK: 0x00,   # collision avec les murs uniqement
-        EFFET:  EFFET_FADEOUT,
+        VISI: VISI_NORMAL,
         BODY_TYPE: pm.Body.KINEMATIC
     },
     MODE_REMOVED: {
         COLLISION_CAT: CAT_FRUIT_REMOVED,
         COLLISION_MASK: 0x00,   # collision avec les murs uniqement
-        EFFET: EFFET_HIDDEN,
+        VISI: VISI_HIDDEN,
         BODY_TYPE: pm.Body.KINEMATIC
     }
 }
@@ -105,6 +91,15 @@ def _del_fruit():
 def active_count():
     global _g_fruit_cnt
     return _g_fruit_cnt
+
+# DEBUG transitions old-> new valides
+g_valid_changes = {
+    MODE_WAIT : ( MODE_NORMAL,),
+    MODE_NORMAL : (MODE_EXPLOSE, MODE_GAMEOVER,),
+    MODE_EXPLOSE : (MODE_GAMEOVER, MODE_REMOVED,),
+    MODE_GAMEOVER : (MODE_REMOVED,),
+    MODE_REMOVED : None
+}
 
 
 class Fruit( object ):
@@ -135,14 +130,16 @@ class Fruit( object ):
         self._sprite = sprites.FruitSprite( 
             nom=fruit_def['name'], 
             r=fruit_def['radius'] )
-        self._sprite_effet = EFFET_AUCUN
+        self._sprite_visi = VISI_NORMAL
         self._sprite_explosion = None
+        self._fruit_mode = None
         self._set_mode( MODE_WAIT )
+        print( f"Creation {self}" )
 
 
     def _delete(self):
         #print( f"{self}.delete()")
-        if( self._fruit_mode != MODE_REMOVED):
+        if( not self.removed ):
             print( f"WARNING: {self} delete() avec mode différent de MODE_REMOVED" )
         # remove pymunk objects and local references
         if( self._body or self._shape):
@@ -166,11 +163,6 @@ class Fruit( object ):
         self._delete()
 
 
-    def explode(self):
-        self.fruit_mode = MODE_EXPLOSE
-        s = sprites.ExplosionSprite( self._shape.radius, self.on_explosion_end)
-        s.position = (*self._body.position, 1)
-        self._sprite_explosion = s
 
     @property
     def id(self):
@@ -195,22 +187,25 @@ class Fruit( object ):
             and self._shape==None
             and self._sprite_explosion==None)
 
-    def _set_mode(self, value):
-        # print( f"{self}._setmode({value})")
-        self._fruit_mode = value
-        mode = _FRUIT_MODES[value]
 
-        self._body.body_type = mode[BODY_TYPE]
-        self._sprite_effet = mode[EFFET]
-        if(self._sprite_effet in EFFET_ANIMATIONS):
-            self._start_animation()
-        else:
-            self._stop_animation()
+    def _set_mode(self, mode):
+        # debug
+        old = self._fruit_mode
+        log = f"{self} mode {self._fruit_mode}->{mode}"
+        if( old and mode not in g_valid_changes[old] ):
+            log += " INVALIDE"
+        print(log)
+        self._fruit_mode = mode
+        attrs = _FRUIT_MODES[self._fruit_mode]
+
+        # DYNAMIC ou KINEMATIC
+        self._body.body_type = attrs[BODY_TYPE]
+        self._sprite.visibility = attrs[VISI]
 
         # modifie les règkes de collision
         self._shape.filter = pm.ShapeFilter(
-            categories= mode[COLLISION_CAT],
-            mask = mode[COLLISION_MASK] | CAT_WALLS )  # collision systematique avec les murs
+            categories= attrs[COLLISION_CAT],
+            mask = attrs[COLLISION_MASK] | CAT_WALLS )  # collision systematique avec les murs
 
 
     def __repr__(self):
@@ -230,13 +225,12 @@ class Fruit( object ):
         return body, shape
 
 
-    def create_larger( self, levelup, drop=True ):
-        kind = min( self._kind + levelup, nb_fruits() )
+    def create_larger( self, levelup ):
+        new_kind = min( self._kind + levelup, nb_fruits() )
         fruit =  Fruit( space = self._space,
-                     kind=kind,
+                     kind=new_kind,
                      position = self._body.position)
-        if( drop ):
-            fruit.fade_in()   # pour passer en mode Body.DYNAMIC
+        fruit.fade_in()   # pour passer en mode Body.DYNAMIC
         return fruit
 
 
@@ -247,13 +241,9 @@ class Fruit( object ):
             return
         (x, y) = self._body.position
         degres = -180/3.1416 * self._body.angle  # pymunk et pyglet ont un sens de rotation opposé
-        t = None
-        if( self._animation_start_time and self._sprite_effet in EFFET_ANIMATIONS ):
-            t = pg.clock.get_default().time() - self._animation_start_time
-        self._sprite.update( x=x, y=y, rotation=degres,
-                             effet=self._sprite_effet, 
-                             animation_time=t, on_animation_stop=self._on_animation_stop)
 
+        self._sprite.update( x=x, y=y, rotation=degres,
+                             on_animation_stop=None )
 
     def set_x(self, x):
         assert( self._body.body_type == pm.Body.KINEMATIC ), "disponible seulement sur le fruit en attente"
@@ -264,35 +254,46 @@ class Fruit( object ):
         self._body.position = ( x, y0 )
 
 
-    def drop(self):
+    def blink(self, activate, delay=0):
+        if(not activate):
+            self._sprite._blink_start = None
+        elif( not self._sprite.blink ):
+            self._sprite._blink_start = pg.clock.get_default().time() + delay
+
+
+    def normal(self):
         """met l'objet en mode dynamique pour qu'il tombe"""
         assert not (self._kind is None)
         assert( self._body.body_type == pm.Body.KINEMATIC )
         self._set_mode( MODE_NORMAL )
 
+
     def fade_in(self):
         """ fait apparaitre le sprite avec un effet d'agrandissement et de transparence
         """
-        assert( self._body.body_type == pm.Body.KINEMATIC )
-        self._set_mode( MODE_FADEIN )
+        self.normal()
+        self._sprite.fadein = True
 
-    def set_deborde(self, val):
-        """Mode débordement -> clignote"""
-        if(val):
-            self._set_mode(MODE_DEBORDE)
-        else:
-            self._set_mode(MODE_NORMAL)
+
+    def fade_out(self):
+        assert( self._body.body_type == pm.Body.KINEMATIC )
+        self.normal()
+        self._sprite.fadeout = True
+
 
     def gameover(self):
-        self._set_mode(MODE_GAMEOVER)
+        if( not self.removed ):
+            self._set_mode(MODE_GAMEOVER)
+
 
     def explose(self):
         self._set_mode(MODE_EXPLOSE)
-        sprite = sprites.ExplosionSprite( 
+        explo = sprites.ExplosionSprite( 
             r=self._shape.radius, 
             on_explosion_end=self.remove)
-        sprite.position = ( *self._body.position, 0)
-        self._sprite_explosion = sprite
+        explo.position = ( *self._body.position, 1)
+        self._sprite_explosion = explo
+        self._sprite.fadeout = True
 
     def is_offscreen(self) -> bool :
         if self._is_deleted():
@@ -306,30 +307,49 @@ class Fruit( object ):
         self._delete()
 
 
-    def _on_animation_stop(self):
-        self._set_mode(MODE_NORMAL)
-        self._stop_animation()
+    # def _on_animation_stop(self):
+    #     #self._set_mode(MODE_NORMAL)
+    #     self._stop_animation()
 
-    def _stop_animation(self):
-        self._animation_start_time = None
+    # def _stop_animation(self):
+    #     self._animation_start_time = None
 
-    def _start_animation(self):
-        if( not self._animation_start_time ):
-            self._animation_start_time = pg.clock.get_default().time()
+    # def _start_animation(self):
+    #     if( not self._animation_start_time ):
+    #         self._animation_start_time = pg.clock.get_default().time()
 
 
-class CollisionResolver(object):
+
+def get_fruit_id(arbiter):
+    # détecte le fruit et la maxline dans la collision
+
+    def is_fruit_shape(shape):
+        return shape.collision_type > 0 and shape.collision_type<=nb_fruits()
+
+    if( is_fruit_shape( arbiter.shapes[0]) ):
+        return arbiter.shapes[0].fruit_id
+    elif ( is_fruit_shape( arbiter.shapes[1])):
+        return arbiter.shapes[1].fruit_id
+    else:
+        raise RuntimeError( "Collision sans fruit")
+
+
+ACTION_DEBORDE_DEBUT = 'deborde_debut'
+ACTION_DEBORDE_FIN   = 'deborde_fin'
+ACTION_EXPLOSE       = 'explose'
+
+class CollisionHelper(object):
     """ Contient lecallback appelé par pymunk pour chaque collision 
     et les algorithmes de choix des fruits à fusionner et créer
     """
     def __init__(self, space):
         self.reset()
-        self._space = space
-        self.setup_handlers()
+        self.setup_handlers( space )
 
 
     def reset( self ):
-        self._collisions = []
+         self._collisions_fruits = []
+         self._actions = {}
 
 
     def collision_fruit( self, arbiter ):
@@ -337,20 +357,31 @@ class CollisionResolver(object):
         """
         shapes = arbiter.shapes
         assert( len(shapes)==2 ), " WTF ???"
-        self._collisions.append( (shapes[0].fruit_id, shapes[1].fruit_id) )
+        self._collisions_fruits.append( (shapes[0].fruit_id, shapes[1].fruit_id) )
         return True   # ne pas ignorer la collision dans la suite
+
+    def collision_maxline(self, arbiter, action):
+        assert action in [ACTION_DEBORDE_FIN, ACTION_DEBORDE_DEBUT]
+        id = get_fruit_id(arbiter)
+        self._actions[id]=action
+#        print( f"{self._actions[id]} pour fruit {id}")
+        return False # collision non prise en compte pour la simu physique
 
 
     def _eliminations(self):
         """ recherche les composantes connexes dans le graphe des collisions
         Le graphe est défini par une liste d'adjacence
         """
+        if( not self._collisions_fruits ):  # optimisation
+            return []
+
         # ensemble des boules concernées par les collisions à résoudre
-        fruit_ids = set([  pair[0] for pair in self._collisions] + [pair[1] for pair in self._collisions ])
+        fruit_ids = set( [pair[0] for pair in self._collisions_fruits] 
+                        +[pair[1] for pair in self._collisions_fruits] )
 
         # construit le graphe des boules en contact
         g = { ball:set() for ball in fruit_ids }
-        for (a, b) in self._collisions :
+        for (a, b) in self._collisions_fruits :
             g[a].add(b)
             g[b].add(a)
 
@@ -362,7 +393,6 @@ class CollisionResolver(object):
         for origine in fruit_ids:
             if origine in already_found:
                 continue
-
             already_found.append(origine)
             composante = {origine}
             suivant = [origine]
@@ -377,38 +407,48 @@ class CollisionResolver(object):
         return composantes
 
 
-    def resolve(self, fruits):
-        """ renvoie un tuple
-            liste des fruits créés par fusion des fruits en contact
-            liste des id des fruits fusionnés ( pour suppression )        
+    def process_collisions(self, fruits):
+        """ modifie les fruits selon collisions apparues pendant pymunk.step()
         """
-        created = [] 
-        to_remove = []
+        # traite les explosions 
+        for explose_ids in self._eliminations():
 
-        for groupe in self._eliminations():
-            print( f"Elimination de {groupe}" )
+            # liste de Fruit à partir des ids, trié par vitesse croissante
+            explose_fruits = [ fruits[id] for id in explose_ids ]
+            explose_fruits.sort(key=lambda f:f.scalar_velocity)
 
-            # on garde l'objet le plus lent
-            slowest = None
-            for id in groupe:
-                f = fruits[id]
-                if(not slowest):
-                    slowest = f
-                if( f.scalar_velocity < slowest.scalar_velocity ):
-                    slowest = f
+            # remplace les fruits explosés par un seul nouveau fruit de taille supérieure
+            levelup = len(explose_fruits) - 1  
+            new_fruit = explose_fruits[0].create_larger(levelup=levelup)
+            fruits[new_fruit.id] = new_fruit
 
-            # remplace les boules par une seule de la taille supérieure
-            new_fruit = slowest.create_larger(levelup = len(groupe)-1 )
-            created.append(new_fruit)
-            # marque les fruits à supprimer
-            to_remove += groupe
+            print( f"Fusion {explose_fruits} -> {new_fruit}" )
 
-        return created, to_remove
+            # marque les fruits supprimés pour explosion
+            # remplace les chgts de  mode sur collisions avec maxline (explosion prioritaire sur débordement)
+            for f in explose_fruits:
+                self._actions[f.id] = ACTION_EXPLOSE
+
+        # modifie les fruits
+        for (id, action) in self._actions.items():
+#            print( f"action {action} pour fruit {id}")
+            if( action==ACTION_EXPLOSE ):
+                fruits[id].explose()
+            elif( action==ACTION_DEBORDE_DEBUT ):
+                fruits[id].blink( activate=True,delay=DELAI_CLIGNOTEMENT )
+            elif( action==ACTION_DEBORDE_FIN ):
+                fruits[id].blink( activate=False )
+            else:
+                raise RuntimeError( f"action {action} inconnue")
 
 
-    def setup_handlers(self):
+    def setup_handlers(self, space):
         # collisions entre fruits
         for id in range(1, nb_fruits()+1):
-            h = self._space.add_collision_handler(id, id)
+            h = space.add_collision_handler(id, id)
             h.begin = lambda arbiter, space, data : self.collision_fruit(arbiter)
 
+        # collisions avec maxline
+        h = space.add_wildcard_collision_handler( COLLISION_TYPE_MAXLINE )
+        h.begin = lambda arbiter, space, data : self.collision_maxline(arbiter, ACTION_DEBORDE_DEBUT)
+        h.separate = lambda arbiter, space, data : self.collision_maxline(arbiter, ACTION_DEBORDE_FIN)

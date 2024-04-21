@@ -4,13 +4,9 @@ from constants import *
 
 pg.resource.path = ['assets/']
 
-EFFET_AUCUN = 'aucun'
-EFFET_BLINK = 'blink'
-EFFET_FADEIN = 'fade_in'
-EFFET_FADEOUT = 'fade_out'
-EFFET_GAMEOVER = 'game_over'
-EFFET_HIDDEN = 'hidden'
-EFFET_ANIMATIONS = [EFFET_BLINK, EFFET_FADEIN, EFFET_FADEOUT ]
+VISI_NORMAL = 'aucun'
+VISI_GAMEOVER = 'game_over'
+VISI_HIDDEN = 'hidden'
 
 _groups = {
     SPRITE_GROUP_FOND : pg.graphics.Group( order = 0 ),
@@ -26,6 +22,9 @@ def group(name):
 
 def batch():
     return _g_batch
+
+def now():
+    return pg.clock.get_default().time()
 
 
 # Ligne rouge de niveau maxi
@@ -45,61 +44,109 @@ class SuikaSprite ( pg.sprite.Sprite ):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._animation_start_time = None
-        self._on_animation_stop = None
-        self.update_effet(EFFET_AUCUN)
+        self._blink_start = None
+        self._fadein_start = None 
+        self._fadeout_start = None
+        self._visibility = VISI_NORMAL
+    
 
-    # intercepte l'update du pyglet.spite.Sprite pour traiter les animations
-    def update(self, x, y, rotation, effet, animation_time, on_animation_stop):
-        self.update_sprite(x, y, rotation)
-        self.update_effet(effet)
-        if( effet in EFFET_ANIMATIONS ):
-            return self.update_animation(effet, animation_time, on_animation_stop)
-
-    def update_sprite(self, x, y, rotation):
-        # peuvent être modifiés par les animations ensuite
-        pg.sprite.Sprite.update( self, x=x, y=y, rotation=rotation,
-                                 scale_x=self._scale_ref[0],
-                                 scale_y=self._scale_ref[1] )
-        self.opacity = self._opacity_ref 
-
-    def update_animation(self, effet, animation_time, on_animation_stop):
-        """ t = animation_time (sec)"""
-        t =  animation_time
-
-        # apparition avec effet de taille et transparence
-        if( effet == EFFET_FADEIN ):
-            ratio_size = min(1, ( t * (1-SIZESTART_FADEIN)/DELAI_FADEIN + SIZESTART_FADEIN ))
-            self.scale_x = self._scale_ref[0] * ratio_size
-            self.scale_y = self._scale_ref[1] * ratio_size
-            if( ratio_size >= 1.20 ):
-                on_animation_stop()
-
-        # clignotement des fruit (5 Hz), temporisé de DELAI_CLIGNOTEMENT
-        elif( effet == EFFET_BLINK ):
-            t_blink = int(max( 0, 5*256*(t-DELAI_CLIGNOTEMENT) )) % 256
-            self.opacity = 127 + abs(t_blink-128)
-
-        # fadeout
-        elif( effet == EFFET_FADEOUT ):
-            opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
-            if( opacity <= 0 ):
-                on_animation_stop()
-            self.opacity = int( max( 0, 255*(DELAI_FADEOUT-t)/DELAI_FADEOUT))
-        # fallback
-        else:
-            print( f"ERREUR: timer d'animation de sprite inutilisé avec effet '{self._effect}'" )
+    @property
+    def fadein(self):
+        return bool(self._fadein_start)
+    
+    @fadein.setter
+    def fadein(self, activate ):
+        if( activate and not self._fadein_start ):
+            self._fadein_start = now()
+            self._fadeout_start = None
+        elif( not activate ):
+            self._fadein_start = None
 
 
-    def update_effet( self, effet ):
-        if (effet == EFFET_AUCUN or effet in EFFET_ANIMATIONS ):
+    @property
+    def fadeout(self):
+        return bool(self._fadeout_start)
+    
+    @fadeout.setter
+    def fadeout(self, activate):
+        if( activate and not self._fadeout_start ):
+            self._fadein_start = None
+            self._fadeout_start = now()
+        elif( not activate ):
+            self._fadeout_start = None
+
+
+    @property
+    def blink(self):
+        return bool(self._blink_start)
+    
+    @blink.setter
+    def blink(self, activate):
+        if( activate and not self._blink_start ):
+            self._blink_start = now()
+        elif( not activate ):
+            self._blink_start = None
+
+
+    @property
+    def visibility(self):
+        return self._visibility
+    
+    @visibility.setter
+    def visibility(self, visi):
+        if (visi == VISI_NORMAL):
             self._opacity_ref = 255
-        elif(effet== EFFET_GAMEOVER):
+        elif(visi == VISI_GAMEOVER ):
             self._opacity_ref = 64
-        elif(effet== EFFET_HIDDEN):
+        elif(visi == VISI_HIDDEN ):
             self.visible = False
         else:
-            print(f"warning: effet {effet} inconnu")
+            print(f"warning: visibilité {visi} inconnue")
+
+
+    # intercepte l'update du pyglet.spite.Sprite pour traiter les animations
+    def update(self, x, y, rotation, on_animation_stop):
+
+        # position
+        pg.sprite.Sprite.update( self, x=x, y=y, rotation=rotation )
+
+        # gestion des effets animés
+        coef_size = 1.0
+        coef_opacity = 1.0
+
+        # fadein
+        if( self._fadein_start ):
+            assert( not self.fadeout )
+            t = pg.clock.get_default().time() - self._fadein_start
+            a =  t * (1-SIZESTART_FADEIN)/DELAI_FADEIN + SIZESTART_FADEIN
+            if( a >= 1.20 ):
+                self.fadein = False
+                if( on_animation_stop ):
+                    on_animation_stop()
+            coef_size = min( 1.20, a )
+            coef_opacity = min (1, a)
+
+        # effet fadeout
+        if( self._fadeout_start ):
+            assert( not self.fadein )
+            t = pg.clock.get_default().time() - self._fadeout_start
+            a =  (DELAI_FADEOUT - t) / DELAI_FADEOUT
+            if( a < 0 ):
+                #self.fadeout = False   # ne supprime pas l'effst sinon le sprite reapparait
+                if( on_animation_stop ):
+                    on_animation_stop()
+            coef_size = max(0.2, a)
+            coef_opacity = max( 0, a )
+
+        # blink modifie l'opacité multiplicativement avec les autres animations
+        if( self._blink_start ):
+            dt = pg.clock.get_default().time() - self._blink_start
+            if( dt > 0 ):
+                coef_opacity *= (0.5 + abs((dt % 1)-0.5))
+
+        self.scale_x = self._scale_ref[0] * coef_size
+        self.scale_y = self._scale_ref[1] * coef_size
+        self.opacity = int(self._opacity_ref  * coef_opacity)
 
 
 class FruitSprite( SuikaSprite ):
