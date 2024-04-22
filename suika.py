@@ -252,7 +252,7 @@ class SuikaWindow(pg.window.Window):
             self._next_fruit.normal()
             self._next_fruit = None
             if( not self._is_autoplay ):
-                pg.clock.schedule_once( self.add_next_fruit, delay=NEXT_FRUIT_DELAY)
+                pg.clock.schedule_once( self.add_next_fruit, delay=NEXT_FRUIT_INTERVAL)
 
         # Supprime un fruit sur clic droit
         if( (button & pg.window.mouse.RIGHT) and not self._is_gameover ):
