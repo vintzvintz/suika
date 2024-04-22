@@ -7,6 +7,7 @@ import pymunk as pm
 from constants import *
 import fruit, sprites, walls, gui
 from fruit import Fruit
+import utils
 
 
 SPEEDMETER_BUFSIZE = 200
@@ -24,44 +25,41 @@ class Speedmeter(object):
         if( (self._ticks % 20)==0 ):
             self.value = len(self._history) / sum(self._history)
 
-
-    def tick_abs(self, new_val ):
-        raise NotImplementedError
-        self._ticks += 1
-        prev_val = self._history[-1]
-        self._history.append( new_val-prev_val)
+    # def tick_abs(self, new_val ):
+    #     raise NotImplementedError
+    #     self._ticks += 1
+    #     prev_val = self._history[-1]
+    #     self._history.append( new_val-prev_val)
 
 
 class CountDown(object):
     def __init__(self):
-        self.reset()
-
-    def start(self):
-        if( not self._start_time ):
-                self._start_time = pg.clock.get_default().time()
-
-    def reset(self):
         self._start_time = None
 
+
+    def update(self, deborde):
+        if( deborde and not self._start_time ):
+            print( "countdown start")
+            self._start_time = utils.now()  # ne remet pas à zero si déja en cours
+        elif( not deborde ):
+            self._start_time = None
+            #debug
+            if( self._start_time ):
+                print( "countdown stop")
+
     def status(self):
-        """ Renvoie un tuple (gameover, texte)
-            gameover : booleen vrai si la partie est perdue
-            text : message d'info sur le compte à rebours
+        """ Renvoie un tuple (t, texte)
+            val: valeur du compte à rebours au moment de l'appel de status()
+            txt : message d'info sur le compte à rebours
         """
         if (not self._start_time):
-            return (False, "")
+            return (0, "")
 
-        t = pg.clock.get_default().time() - self._start_time 
-        etat = t > DELAI_DEBORDEMENT
+        t = self._start_time + GAMEOVER_DELAY - utils.now()
         text = ""
-        if( t>DELAI_CLIGNOTEMENT ):
-            text = f"defaite dans {DELAI_DEBORDEMENT-t:.02f}s"
-        return (etat, text)
-    
-    def is_expired(self):
-        return ( self._start_time and  
-                (pg.clock.get_default().time() - self._start_time) > DELAI_DEBORDEMENT)
-
+        if( t <  COUNTDOWN_DISPLAY_LIMIT ):
+            text = f"Defaite dans {t:.02f}s"
+        return (t, text)
 
 
 AUTOPLAY_FLOW = 1 + WINDOW_WIDTH // 750
@@ -91,7 +89,7 @@ class SuikaWindow(pg.window.Window):
         self._score = 0
         self._is_gameover = False
         self._collision_helper.reset()
-        self._countdown.reset()
+        self._countdown.update( deborde=False )
         self._labels.reset()
         self._is_paused = False
         self._is_autoplay = False
@@ -127,7 +125,7 @@ class SuikaWindow(pg.window.Window):
     def autoplay(self, dt):
         if( not self._is_autoplay or self._is_paused or self._is_gameover ):
             return
-        for i in range(AUTOPLAY_FLOW):
+        for _ in range(AUTOPLAY_FLOW):
             f = Fruit( self._space, kind= random.randint(1,4)  )
             f.set_x( random.randint(0, WINDOW_WIDTH))
             f.normal()
@@ -137,37 +135,39 @@ class SuikaWindow(pg.window.Window):
     def gameover(self):
         """ Actions en cas de partie perdue
         """
+        print("GAMEOVER")
         self._is_gameover = True    # inhibe les actions de jeu
-        if( self._next_fruit ):
-            self.remove_fruit_by_id( self._next_fruit.id )
-            self._next_fruit = None
         for f in self._fruits.values():
             f.gameover()
+        if( self._next_fruit ):
+            self._next_fruit.remove()
+            self._next_fruit = None
         self._labels.show_gameover()
+
+    def toggle_autoplay(self):
+            self._is_autoplay = not self._is_autoplay
+            if( self._is_autoplay and self._next_fruit):
+                self._next_fruit.remove()
+                self._next_fruit = None
+            if( not self._is_autoplay and not self._next_fruit ):
+                self.add_next_fruit()
 
 
     def shoot_fruit(self, x, y):
-        print(f"Shoot x={x} y={y}")
         qi = self._space.point_query( (x, y), max_distance=0, shape_filter=pm.ShapeFilter() )
-        try:
-            if( len(qi)==0 ):
-                print("clic-droit dans le vide")
-            else:
-                if( len(qi)>1 ):
-                    print("Warning: plusieurs formes superposées")
-                id = qi[0].shape.fruit_id
-                fruit = self._fruits[id]
-                print(f"shooted {fruit}")
-                self.remove_fruit_by_id( id )
-        except KeyError:
-            pass    # aucune erreur fatale avec les shoots de fruits
+        if( len(qi)>0 ):
+            id = qi[0].shape.fruit_id
+            f = self._fruits[id]
+            if( f.is_mode_normal ):
+                f.remove()
+                print(f"shooted {f}")
 
 
     def update(self, dt):
         """Avance d'un pas la simulation physique
         """
         self.pymunk_speedmeter.tick_rel(dt)
-        if( self._is_paused or self._is_gameover ):
+        if( self._is_paused ):
             return
 
         # calcule les positions des objets
@@ -175,12 +175,7 @@ class SuikaWindow(pg.window.Window):
         self._space.step( PYMUNK_INTERVAL )
 
         # modifie les fruits selon les collisions détectées
-        self._collision_helper.process_collisions( self._fruits )
-
-        # # Supprime les fruits marqués pour suppression
-        # ids_to_remove = [ id for (id, f) in self._fruits.items() if f.removed ]
-        # for id in ids_to_remove:
-        #     self.remove_fruit_by_id( id )
+        self._collision_helper.process_collisions( self._fruits, self._is_gameover )
 
         # check
         offscreen = {f for f in self._fruits.values() if f.is_offscreen() }
@@ -191,7 +186,7 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_draw(self):
-        assert fruit.active_count() - len(self._fruits) < 10 , "Ressource leak"
+        assert fruit.active_count() - len(self._fruits) < 20 , "Ressource leak"
 
         # met a jour les positions des fruits 
         for f in self._fruits.values():
@@ -199,20 +194,25 @@ class SuikaWindow(pg.window.Window):
 
         # gere le countdown en cas  de débordement
         ids = self._walls.fruits_sur_maxline()
-        if( ids ):
-            self._countdown.start()  # ne remet pas à zero si déja en cours
-        else:
-            self._countdown.reset()
+        self._countdown.update( ids )
 
         # met à jour l'affichage et détecte la fin de partie
-        gameover, countdown_txt = self._countdown.status()
-        self._labels.update( gui.TOP_LEFT, f"fruits {len(self._fruits)}" )
-        #self._labels.update( gui.TOP_RIGHT, f"score {self._score}" )
-        self._labels.update( gui.TOP_RIGHT, f"FPS {self.pymunk_speedmeter.value:.0f}" )
-        self._labels.update( gui.TOP_CENTER, countdown_txt )
+        countdown_val, countdown_txt = self._countdown.status()
 
-        if( gameover and not self._is_gameover ):
+        if( countdown_val < 0 and not self._is_gameover ):
             self.gameover()
+
+        # l'ordre des conditions définit la priorité des messages
+        game_status = ""
+        if( self._is_autoplay ):  game_status = "AUTOPLAY"
+        if( countdown_txt ):      game_status = countdown_txt
+        if( self._is_paused ):    game_status = "PAUSE"
+        if( self._is_gameover ):  game_status = "GAME OVER"
+
+        #self._labels.update( gui.TOP_LEFT, f"fruits {len(self._fruits)}" )
+        self._labels.update( gui.TOP_LEFT, f"score {self._score}" )
+        self._labels.update( gui.TOP_RIGHT, f"FPS {self.pymunk_speedmeter.value:.0f}" )
+        self._labels.update( gui.TOP_CENTER, game_status )
 
         # met à jour l'affichage
         self.clear()
@@ -221,38 +221,38 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_key_press(self, symbol, modifiers):
-        print(f"key {symbol} was pressed")
+        #print(f"key {symbol} was pressed")
 
         # ESC ferme le jeu dans tous les cas
         if(symbol == pg.window.key.ESCAPE):
             self.close()
-            return pg.event.EVENT_HANDLED
-        
         # n'importe quelle autre touche que ESC relance une partie si gameover
-        if(self._is_gameover):
+        elif(self._is_gameover):
             self.reset_game()
-            return pg.event.EVENT_HANDLED
-
         # A controle l'autoplay
-        if(symbol == pg.window.key.A):
-            self._is_autoplay = not self._is_autoplay
-            return pg.event.EVENT_HANDLED
-
+        elif(symbol == pg.window.key.A):
+            self.toggle_autoplay()
         # SPACE met le jeu en pause
-        if(symbol == pg.window.key.SPACE):
+        elif(symbol == pg.window.key.SPACE):
             self._is_paused = not self._is_paused
-            return pg.event.EVENT_HANDLED
+        else:
+            return pg.event.EVENT_UNHANDLED
         
-        return pg.event.EVENT_UNHANDLED
+        return pg.event.EVENT_HANDLED
 
 
     def on_mouse_press(self, x, y, button, modifiers):
+        # relance une partie si la précédente est terminée
+        if( self._is_gameover ):
+            self.reset_game()
+
         # laĉhe le next_fruit
         if( (button & pg.window.mouse.LEFT) and self._next_fruit and not self._is_gameover ):
             self._next_fruit.set_x( x )
             self._next_fruit.normal()
             self._next_fruit = None
-            pg.clock.schedule_once( self.add_next_fruit, delay=0.5)
+            if( not self._is_autoplay ):
+                pg.clock.schedule_once( self.add_next_fruit, delay=NEXT_FRUIT_DELAY)
 
         # Supprime un fruit sur clic droit
         if( (button & pg.window.mouse.RIGHT) and not self._is_gameover ):

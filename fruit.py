@@ -4,6 +4,7 @@ import pyglet as pg
 import pymunk as pm
 
 from constants import *
+import utils
 import sprites
 from sprites import VISI_NORMAL, VISI_GAMEOVER, VISI_HIDDEN
 
@@ -56,7 +57,7 @@ _FRUIT_MODES = {
         COLLISION_CAT: CAT_FRUIT,
         COLLISION_MASK: CAT_FRUIT,
         VISI: VISI_GAMEOVER,
-        BODY_TYPE: pm.Body.KINEMATIC
+        BODY_TYPE: pm.Body.DYNAMIC
     },
     MODE_EXPLOSE: {
         COLLISION_CAT: CAT_FRUIT_EXPLOSE,
@@ -93,8 +94,8 @@ def active_count():
     return _g_fruit_cnt
 
 # DEBUG transitions old-> new valides
-g_valid_changes = {
-    MODE_WAIT : ( MODE_NORMAL,),
+g_valid_transitions = {
+    MODE_WAIT : ( MODE_NORMAL,MODE_REMOVED ),
     MODE_NORMAL : (MODE_EXPLOSE, MODE_GAMEOVER,),
     MODE_EXPLOSE : (MODE_GAMEOVER, MODE_REMOVED,),
     MODE_GAMEOVER : (MODE_REMOVED,),
@@ -102,8 +103,32 @@ g_valid_changes = {
 }
 
 
+class AnimatedCircle( pm.Circle ):
+    def __init__(self, **kwargs ):
+        super().__init__(**kwargs)
+        self._grow_start = None
+        self._radius_ref = self.radius
+    
+    def grow_start( self, coef_start=FADE_SIZE ):
+        """lance une animation qui fait varier le rayon en fonction du temps
+        """
+        if( not hasattr(self, '_grow_start') or self._grow_start is None ):  # lazy initialisation
+            self._grow_start = utils.now()
+
+    def update_animation(self):
+        """modifie le rayon du cercle
+        """
+        if( not self._grow_start ):
+            return
+        t = utils.now()-self._grow_start
+        x = t * (1-FADE_SIZE)/ FADEIN_DELAY + FADE_SIZE
+        self.unsafe_set_radius( self._radius_ref * min(1, x) )
+        if( x > 1 ):
+            self._grow_start = None
+
+
 class Fruit( object ):
-    def __init__(self, space, kind=0, position=None):
+    def __init__(self, space, kind=0, position=None, mode=MODE_WAIT):
         _new_fruit()
         # espece aléatoire si non spécifiée
         assert kind<=nb_fruits(), "type de balle invalide"
@@ -133,14 +158,30 @@ class Fruit( object ):
         self._sprite_visi = VISI_NORMAL
         self._sprite_explosion = None
         self._fruit_mode = None
-        self._set_mode( MODE_WAIT )
+        self._set_mode( mode )
         print( f"Creation {self}" )
 
 
+    def __repr__(self):
+        return f"{_FRUITS_DEF[self._kind]['name']}#{self._id}"
+
+
+    def _make_shape(self, radius, mass, position):
+        """ cree le body/shape pymunk pour la simulation physique
+        """
+        body = pm.Body(body_type = pm.Body.KINEMATIC)
+        body.position = position
+        shape = AnimatedCircle(body=body, radius=radius)
+        shape.mass = mass
+        shape.friction = FRICTION
+        #  ajoute fruit_id comme attribut custom de l'objet pymunk 
+        shape.fruit_id = self._id
+        return body, shape
+
+
     def _delete(self):
-        #print( f"{self}.delete()")
         if( not self.removed ):
-            print( f"WARNING: {self} delete() avec mode différent de MODE_REMOVED" )
+            print( f"WARNING: {self} delete() avec mode différent de MODE_REMOVED ({self._fruit_mode})" )
         # remove pymunk objects and local references
         if( self._body or self._shape):
             #print( f"{self}.delete()")
@@ -163,7 +204,6 @@ class Fruit( object ):
         self._delete()
 
 
-
     @property
     def id(self):
         return self._id
@@ -175,6 +215,10 @@ class Fruit( object ):
     @property
     def points(self):
         return self._kind
+    
+    @property
+    def is_mode_normal(self):
+        return self._fruit_mode == MODE_NORMAL
 
     @property
     def removed(self):
@@ -190,11 +234,11 @@ class Fruit( object ):
 
     def _set_mode(self, mode):
         # debug
-        old = self._fruit_mode
-        log = f"{self} mode {self._fruit_mode}->{mode}"
-        if( old and mode not in g_valid_changes[old] ):
-            log += " INVALIDE"
-        print(log)
+        # old = self._fruit_mode
+        # log = f"{self} mode {self._fruit_mode}->{mode}"
+        # if( old and mode not in g_valid_transitions[old] ):
+        #     log += " INVALIDE"
+        # print(log)
         self._fruit_mode = mode
         attrs = _FRUIT_MODES[self._fruit_mode]
 
@@ -206,23 +250,6 @@ class Fruit( object ):
         self._shape.filter = pm.ShapeFilter(
             categories= attrs[COLLISION_CAT],
             mask = attrs[COLLISION_MASK] | CAT_WALLS )  # collision systematique avec les murs
-
-
-    def __repr__(self):
-        return f"{_FRUITS_DEF[self._kind]['name']}#{self._id}"
-
-
-    def _make_shape(self, radius, mass, position):
-        """ cree le body/shape pymunk pour la simulation physique
-        """
-        body = pm.Body(body_type = pm.Body.KINEMATIC)
-        body.position = position
-        shape = pm.Circle(body, radius)
-        shape.mass = mass
-        shape.friction = FRICTION
-        #  ajoute fruit_id comme attribut custom de l'objet pymunk 
-        shape.fruit_id = self._id
-        return body, shape
 
 
     def create_larger( self, levelup ):
@@ -241,9 +268,10 @@ class Fruit( object ):
             return
         (x, y) = self._body.position
         degres = -180/3.1416 * self._body.angle  # pymunk et pyglet ont un sens de rotation opposé
-
         self._sprite.update( x=x, y=y, rotation=degres,
                              on_animation_stop=None )
+        self._shape.update_animation()
+        
 
     def set_x(self, x):
         assert( self._body.body_type == pm.Body.KINEMATIC ), "disponible seulement sur le fruit en attente"
@@ -252,6 +280,7 @@ class Fruit( object ):
         x = min(x, WINDOW_WIDTH - self._shape.radius)
         (x0, y0) = self._body.position
         self._body.position = ( x, y0 )
+        self._sprite.position = ( x, y0, 0 )
 
 
     def blink(self, activate, delay=0):
@@ -273,6 +302,7 @@ class Fruit( object ):
         """
         self.normal()
         self._sprite.fadein = True
+        self._shape.grow_start()
 
 
     def fade_out(self):
@@ -284,6 +314,9 @@ class Fruit( object ):
     def gameover(self):
         if( not self.removed ):
             self._set_mode(MODE_GAMEOVER)
+            self._sprite.fadein = False
+            self._sprite.fadeout = False
+            self._sprite.blink = False
 
 
     def explose(self):
@@ -305,19 +338,6 @@ class Fruit( object ):
     def remove(self):
         self._set_mode(MODE_REMOVED)
         self._delete()
-
-
-    # def _on_animation_stop(self):
-    #     #self._set_mode(MODE_NORMAL)
-    #     self._stop_animation()
-
-    # def _stop_animation(self):
-    #     self._animation_start_time = None
-
-    # def _start_animation(self):
-    #     if( not self._animation_start_time ):
-    #         self._animation_start_time = pg.clock.get_default().time()
-
 
 
 def get_fruit_id(arbiter):
@@ -407,7 +427,7 @@ class CollisionHelper(object):
         return composantes
 
 
-    def process_collisions(self, fruits):
+    def process_collisions(self, fruits, is_gameover):
         """ modifie les fruits selon collisions apparues pendant pymunk.step()
         """
         # traite les explosions 
@@ -420,6 +440,8 @@ class CollisionHelper(object):
             # remplace les fruits explosés par un seul nouveau fruit de taille supérieure
             levelup = len(explose_fruits) - 1  
             new_fruit = explose_fruits[0].create_larger(levelup=levelup)
+            if( is_gameover ):
+                new_fruit.gameover()
             fruits[new_fruit.id] = new_fruit
 
             print( f"Fusion {explose_fruits} -> {new_fruit}" )
@@ -435,7 +457,7 @@ class CollisionHelper(object):
             if( action==ACTION_EXPLOSE ):
                 fruits[id].explose()
             elif( action==ACTION_DEBORDE_DEBUT ):
-                fruits[id].blink( activate=True,delay=DELAI_CLIGNOTEMENT )
+                fruits[id].blink( activate=True,delay=BLINK_DELAY )
             elif( action==ACTION_DEBORDE_FIN ):
                 fruits[id].blink( activate=False )
             else:

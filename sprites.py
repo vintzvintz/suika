@@ -1,6 +1,7 @@
 
 import pyglet as pg
 from constants import *
+import utils
 
 pg.resource.path = ['assets/']
 
@@ -22,9 +23,6 @@ def group(name):
 
 def batch():
     return _g_batch
-
-def now():
-    return pg.clock.get_default().time()
 
 
 # Ligne rouge de niveau maxi
@@ -57,7 +55,7 @@ class SuikaSprite ( pg.sprite.Sprite ):
     @fadein.setter
     def fadein(self, activate ):
         if( activate and not self._fadein_start ):
-            self._fadein_start = now()
+            self._fadein_start = utils.now()
             self._fadeout_start = None
         elif( not activate ):
             self._fadein_start = None
@@ -71,7 +69,7 @@ class SuikaSprite ( pg.sprite.Sprite ):
     def fadeout(self, activate):
         if( activate and not self._fadeout_start ):
             self._fadein_start = None
-            self._fadeout_start = now()
+            self._fadeout_start = utils.now()
         elif( not activate ):
             self._fadeout_start = None
 
@@ -83,7 +81,7 @@ class SuikaSprite ( pg.sprite.Sprite ):
     @blink.setter
     def blink(self, activate):
         if( activate and not self._blink_start ):
-            self._blink_start = now()
+            self._blink_start = utils.now()
         elif( not activate ):
             self._blink_start = None
 
@@ -117,20 +115,20 @@ class SuikaSprite ( pg.sprite.Sprite ):
         # fadein
         if( self._fadein_start ):
             assert( not self.fadeout )
-            t = pg.clock.get_default().time() - self._fadein_start
-            a =  t * (1-SIZESTART_FADEIN)/DELAI_FADEIN + SIZESTART_FADEIN
-            if( a >= 1.20 ):
+            t = utils.now() - self._fadein_start
+            a =  t * (1-FADE_SIZE)/FADEIN_DELAY + FADE_SIZE
+            if( a >= FADEIN_OVERSHOOT ):
                 self.fadein = False
                 if( on_animation_stop ):
                     on_animation_stop()
-            coef_size = min( 1.20, a )
+            coef_size = min( FADEIN_OVERSHOOT, a )
             coef_opacity = min (1, a)
 
         # effet fadeout
         if( self._fadeout_start ):
             assert( not self.fadein )
-            t = pg.clock.get_default().time() - self._fadeout_start
-            a =  (DELAI_FADEOUT - t) / DELAI_FADEOUT
+            t = utils.now() - self._fadeout_start
+            a =  (FADEOUT_DELAY - t) / FADEOUT_DELAY
             if( a < 0 ):
                 #self.fadeout = False   # ne supprime pas l'effst sinon le sprite reapparait
                 if( on_animation_stop ):
@@ -140,9 +138,9 @@ class SuikaSprite ( pg.sprite.Sprite ):
 
         # blink modifie l'opacité multiplicativement avec les autres animations
         if( self._blink_start ):
-            dt = pg.clock.get_default().time() - self._blink_start
+            dt = utils.now() - self._blink_start
             if( dt > 0 ):
-                coef_opacity *= (0.5 + abs((dt % 1)-0.5))
+                coef_opacity *= (0.5 + abs(( (BLINK_FREQ * dt) % 1) - 0.5))
 
         self.scale_x = self._scale_ref[0] * coef_size
         self.scale_y = self._scale_ref[1] * coef_size
@@ -208,7 +206,7 @@ class ExplosionSprite( SuikaSprite ):
         return pg.image.Animation.from_image_sequence( 
             sequence=seq, 
             loop=False,
-            duration=DELAI_FADEOUT / len(seq))
+            duration=EXPLOSION_DELAY / len(seq))
     
 
     def _make_animated_sprite(self, r):
@@ -216,6 +214,7 @@ class ExplosionSprite( SuikaSprite ):
                          batch = batch(),
                          group=group(SPRITE_GROUP_EXPLOSIONS))
         self.opacity=128
+
 
     # Event envoyé par pyglet automatiquement
     def on_animation_end(self):
