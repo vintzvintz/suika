@@ -1,5 +1,4 @@
 import random
-import collections
 
 import pyglet as pg
 import pymunk as pm
@@ -8,58 +7,6 @@ from constants import *
 import fruit, sprites, walls, gui
 from fruit import Fruit
 import utils
-
-
-SPEEDMETER_BUFSIZE = 200
-class Speedmeter(object):
-    def __init__(self):
-        self._history = collections.deque( [0] * SPEEDMETER_BUFSIZE, maxlen=SPEEDMETER_BUFSIZE )
-        self.value = 0.0
-        self._ticks = 0
-
-
-    def tick_rel(self, dt):
-        self._ticks += 1
-        self._history.append(dt)
-        # self._history.pop()    # inutile avec maxlen
-        if( (self._ticks % 20)==0 ):
-            self.value = len(self._history) / sum(self._history)
-
-    # def tick_abs(self, new_val ):
-    #     raise NotImplementedError
-    #     self._ticks += 1
-    #     prev_val = self._history[-1]
-    #     self._history.append( new_val-prev_val)
-
-
-class CountDown(object):
-    def __init__(self):
-        self._start_time = None
-
-
-    def update(self, deborde):
-        if( deborde and not self._start_time ):
-            print( "countdown start")
-            self._start_time = utils.now()  # ne remet pas à zero si déja en cours
-        elif( not deborde ):
-            self._start_time = None
-            #debug
-            if( self._start_time ):
-                print( "countdown stop")
-
-    def status(self):
-        """ Renvoie un tuple (t, texte)
-            val: valeur du compte à rebours au moment de l'appel de status()
-            txt : message d'info sur le compte à rebours
-        """
-        if (not self._start_time):
-            return (0, "")
-
-        t = self._start_time + GAMEOVER_DELAY - utils.now()
-        text = ""
-        if( t <  COUNTDOWN_DISPLAY_LIMIT ):
-            text = f"Defaite dans {t:.02f}s"
-        return (t, text)
 
 
 AUTOPLAY_FLOW = 1 + WINDOW_WIDTH // 750
@@ -72,15 +19,15 @@ class SuikaWindow(pg.window.Window):
         self._walls = walls.Walls(space=self._space, width=width, height=height)
         self._fruits = dict()
         self._next_fruit = None
-        self._countdown = CountDown()
+        self._countdown = utils.CountDown()
         self._labels = gui.Labels( window_width=width, window_height=height )
         self._collision_helper = fruit.CollisionHelper(self._space)
         self.reset_game()
         pg.clock.schedule_interval( self.update, interval=PYMUNK_INTERVAL )
-        pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
+        pg.clock.schedule_interval( self.autoplay_spawn, interval=AUTOPLAY_INTERVAL)
         pg.clock.schedule_interval( self.cleanup_fruit_list, interval= 10*PYMUNK_INTERVAL )
         self.fps_display = pg.window.FPSDisplay(self)
-        self.pymunk_speedmeter = Speedmeter()
+        self.pymunk_speedmeter = utils.Speedmeter()
 
 
     def reset_game(self):
@@ -122,7 +69,7 @@ class SuikaWindow(pg.window.Window):
             self.remove_fruit_by_id(id)
 
 
-    def autoplay(self, dt):
+    def autoplay_spawn(self, dt):
         if( not self._is_autoplay or self._is_paused or self._is_gameover ):
             return
         for _ in range(AUTOPLAY_FLOW):
@@ -144,7 +91,7 @@ class SuikaWindow(pg.window.Window):
             self._next_fruit = None
         self._labels.show_gameover()
 
-    def toggle_autoplay(self):
+    def autoplay_toggle(self):
             self._is_autoplay = not self._is_autoplay
             if( self._is_autoplay and self._next_fruit):
                 self._next_fruit.remove()
@@ -163,6 +110,15 @@ class SuikaWindow(pg.window.Window):
                 print(f"shooted {f}")
 
 
+    def check_offscreen(self):
+        """ Supprime les fruits éventuellement sortis du jeu
+        """
+        for f in self._fruits.values():
+            if f.is_offscreen():
+                print( "WARNING {f} sorti du jeu." )
+                f.remove()
+
+
     def update(self, dt):
         """Avance d'un pas la simulation physique
         """
@@ -170,19 +126,14 @@ class SuikaWindow(pg.window.Window):
         if( self._is_paused ):
             return
 
-        # calcule les positions des objets
+        # menage prealable
+        self.check_offscreen()
+        # prepare le gestionnaire de collisions
         self._collision_helper.reset()
-        self._space.step( PYMUNK_INTERVAL )
-
+        # execute 1 pas de simulation physique
+        self._space.step( PYMUNK_INTERVAL )  
         # modifie les fruits selon les collisions détectées
         self._collision_helper.process_collisions( self._fruits, self._is_gameover )
-
-        # check
-        offscreen = {f for f in self._fruits.values() if f.is_offscreen() }
-        if( offscreen ):
-            self.gameover()
-            print( "WARNING balles en dehors du jeu !" )
-
 
 
     def on_draw(self):
@@ -198,7 +149,6 @@ class SuikaWindow(pg.window.Window):
 
         # met à jour l'affichage et détecte la fin de partie
         countdown_val, countdown_txt = self._countdown.status()
-
         if( countdown_val < 0 and not self._is_gameover ):
             self.gameover()
 
@@ -223,17 +173,13 @@ class SuikaWindow(pg.window.Window):
     def on_key_press(self, symbol, modifiers):
         #print(f"key {symbol} was pressed")
 
-        # ESC ferme le jeu dans tous les cas
-        if(symbol == pg.window.key.ESCAPE):
+        if(symbol == pg.window.key.ESCAPE):        # ESC ferme le jeu dans tous les cas
             self.close()
-        # n'importe quelle autre touche que ESC relance une partie si gameover
-        elif(self._is_gameover):
+        elif(self._is_gameover):    # n'importe quelle touche relance une partie apres un gameover
             self.reset_game()
-        # A controle l'autoplay
-        elif(symbol == pg.window.key.A):
-            self.toggle_autoplay()
-        # SPACE met le jeu en pause
-        elif(symbol == pg.window.key.SPACE):
+        elif(symbol == pg.window.key.A):           # A controle l'autoplay
+            self.autoplay_toggle()
+        elif(symbol == pg.window.key.SPACE):        # SPACE met le jeu en pause
             self._is_paused = not self._is_paused
         else:
             return pg.event.EVENT_UNHANDLED

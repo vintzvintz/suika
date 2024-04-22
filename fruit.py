@@ -93,14 +93,15 @@ def active_count():
     global _g_fruit_cnt
     return _g_fruit_cnt
 
-# DEBUG transitions old-> new valides
-g_valid_transitions = {
-    MODE_WAIT : ( MODE_NORMAL,MODE_REMOVED ),
-    MODE_NORMAL : (MODE_EXPLOSE, MODE_GAMEOVER,),
-    MODE_EXPLOSE : (MODE_GAMEOVER, MODE_REMOVED,),
-    MODE_GAMEOVER : (MODE_REMOVED,),
-    MODE_REMOVED : None
-}
+
+# POUR DEBUG transitions old-> new valides
+# g_valid_transitions = {
+#     MODE_WAIT : ( MODE_NORMAL,MODE_REMOVED ),
+#     MODE_NORMAL : (MODE_EXPLOSE, MODE_GAMEOVER,),
+#     MODE_EXPLOSE : (MODE_GAMEOVER, MODE_REMOVED,),
+#     MODE_GAMEOVER : (MODE_REMOVED,),
+#     MODE_REMOVED : None
+# }
 
 
 class AnimatedCircle( pm.Circle ):
@@ -159,7 +160,7 @@ class Fruit( object ):
         self._sprite_explosion = None
         self._fruit_mode = None
         self._set_mode( mode )
-        print( f"Creation {self}" )
+        print( f"{self}" )
 
 
     def __repr__(self):
@@ -341,8 +342,8 @@ class Fruit( object ):
 
 
 def get_fruit_id(arbiter):
-    # détecte le fruit et la maxline dans la collision
 
+    # détecte le fruit et la maxline dans la collision
     def is_fruit_shape(shape):
         return shape.collision_type > 0 and shape.collision_type<=nb_fruits()
 
@@ -378,14 +379,13 @@ class CollisionHelper(object):
         shapes = arbiter.shapes
         assert( len(shapes)==2 ), " WTF ???"
         self._collisions_fruits.append( (shapes[0].fruit_id, shapes[1].fruit_id) )
-        return True   # ne pas ignorer la collision dans la suite
+        return True   # ignore les collisions avec maxline pour la simu physique
 
     def collision_maxline(self, arbiter, action):
         assert action in [ACTION_DEBORDE_FIN, ACTION_DEBORDE_DEBUT]
         id = get_fruit_id(arbiter)
         self._actions[id]=action
-#        print( f"{self._actions[id]} pour fruit {id}")
-        return False # collision non prise en compte pour la simu physique
+        return False  # ignore les collisions avec maxline pour la simu physique
 
 
     def _eliminations(self):
@@ -444,7 +444,7 @@ class CollisionHelper(object):
                 new_fruit.gameover()
             fruits[new_fruit.id] = new_fruit
 
-            print( f"Fusion {explose_fruits} -> {new_fruit}" )
+            print( f"{new_fruit} <--Fusion {explose_fruits}" )
 
             # marque les fruits supprimés pour explosion
             # remplace les chgts de  mode sur collisions avec maxline (explosion prioritaire sur débordement)

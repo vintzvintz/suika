@@ -3,7 +3,6 @@ WINDOW_HEIGHT = 1200
 WINDOW_MAXLINE_MARGIN = 250
 WINDOW_WIDTH  = 800
 
-
 PYMUNK_INTERVAL = 1 / 120.0     # physics engine steps per sec.
 FRICTION = 1.0
 GRAVITY = 9.81
@@ -18,7 +17,7 @@ GAMEOVER_DELAY = 4.0         # secondes
 BLINK_DELAY = 1.0          #secondes
 BLINK_FREQ  = 6.0          # Hz
 FADEOUT_DELAY = 0.2
-FADEIN_DELAY = 0.2
+FADEIN_DELAY = 0.3
 FADEIN_OVERSHOOT = 1.1
 FADE_SIZE = 0.2     # ratio pour la taille de départ (resp. fin) du fade-in (resp. fadeout)
 EXPLOSION_DELAY = 0.5
@@ -27,7 +26,6 @@ EXPLOSION_DELAY = 0.5
 # Identifiants pour dispatcher les collisions sur la logique de jeu ( collision_handler )
 
 # COLLISION_TYPE_*fruits*  définis implicitement (entiers inférieurs à 1000)
-#COLLISION_TYPE_WALL = 1001
 COLLISION_TYPE_MAXLINE = 1000
 
 # catégories pour la creation des collisions
