@@ -225,6 +225,9 @@ class Fruit( object ):
     def removed(self):
         return self._fruit_mode == MODE_REMOVED
     
+    @property
+    def position(self):
+        return self._body.position
 
     def _is_deleted(self):
         return (self._body==None 
@@ -320,7 +323,7 @@ class Fruit( object ):
             self._sprite.blink = False
 
 
-    def explose(self):
+    def explose(self, target_pos=None):
         self._set_mode(MODE_EXPLOSE)
         explo = sprites.ExplosionSprite( 
             r=self._shape.radius, 
@@ -360,7 +363,7 @@ ACTION_DEBORDE_FIN   = 'deborde_fin'
 ACTION_EXPLOSE       = 'explose'
 
 class CollisionHelper(object):
-    """ Contient lecallback appelé par pymunk pour chaque collision 
+    """ Contient le callback appelé par pymunk pour chaque collision 
     et les algorithmes de choix des fruits à fusionner et créer
     """
     def __init__(self, space):
@@ -432,14 +435,19 @@ class CollisionHelper(object):
         """
         # traite les explosions 
         for explose_ids in self._eliminations():
+            assert len( explose_ids ) >= 2, "collision à un seul fruit ???"
 
-            # liste de Fruit à partir des ids, trié par vitesse croissante
+            # liste de Fruit à partir des ids, trié par altitude
             explose_fruits = [ fruits[id] for id in explose_ids ]
-            explose_fruits.sort(key=lambda f:f.scalar_velocity)
+            explose_fruits.sort(key=lambda f:f.position.y)
+
+            # traite uniquement les 2 fruits les plus bas en cas de collision multiple
+            explose_fruits = explose_fruits[0:2]
+
 
             # remplace les fruits explosés par un seul nouveau fruit de taille supérieure
-            levelup = len(explose_fruits) - 1  
-            new_fruit = explose_fruits[0].create_larger(levelup=levelup)
+            #levelup = len(explose_fruits) - 1  
+            new_fruit = explose_fruits[0].create_larger(levelup=1)
             if( is_gameover ):
                 new_fruit.gameover()
             fruits[new_fruit.id] = new_fruit
@@ -451,7 +459,7 @@ class CollisionHelper(object):
             for f in explose_fruits:
                 self._actions[f.id] = ACTION_EXPLOSE
 
-        # modifie les fruits
+        # modifie les fruits - l'ordre des actions est important
         for (id, action) in self._actions.items():
 #            print( f"action {action} pour fruit {id}")
             if( action==ACTION_EXPLOSE ):
