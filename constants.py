@@ -16,13 +16,13 @@ GAMEOVER_DELAY = 4.0         # secondes
 # parametres animations 
 BLINK_DELAY = 1.0          #secondes
 BLINK_FREQ  = 6.0          # Hz
-FADEOUT_DELAY = 0.2
-FADEIN_DELAY = 0.3
-FADEIN_OVERSHOOT = 1.1
-FADE_SIZE = 0.2     # ratio pour la taille de départ (resp. fin) du fade-in (resp. fadeout)
-EXPLOSION_DELAY = 2
-DASHIN_DELAY = EXPLOSION_DELAY
-
+FADEOUT_DELAY = 0.5
+FADEIN_DELAY = 0.08
+FADEIN_OVERSHOOT = 1.15
+FADE_SIZE = 0.2           # ratio pour la taille de départ (resp. fin) du fade-in (resp. fadeout)
+EXPLOSION_DELAY = 0.3
+DASHIN_DELAY = 0.1
+STAY_HIDDEN_DELAY = 0.3
 
 # Identifiants pour dispatcher les collisions sur la logique de jeu ( collision_handler )
 

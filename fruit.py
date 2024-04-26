@@ -29,6 +29,7 @@ _FRUITS_DEF = [
 def nb_fruits():
     return len(_FRUITS_DEF) - 1
 
+MODE_HIDDEN = 'hidden'
 MODE_WAIT = 'wait'
 MODE_NORMAL = 'normal'
 MODE_EXPLOSE = 'explose'
@@ -41,6 +42,12 @@ BODY_TYPE = 'body_type'
 VISI = 'visi'
 
 _FRUIT_MODES = {
+    MODE_HIDDEN: {
+        COLLISION_CAT: CAT_FRUIT_WAIT,
+        COLLISION_MASK: 0x00, # collision avec les murs uniqement
+        VISI: VISI_HIDDEN,
+        BODY_TYPE: pm.Body.KINEMATIC
+    },
     MODE_WAIT: {
         COLLISION_CAT: CAT_FRUIT_WAIT,
         COLLISION_MASK: 0x00, # collision avec les murs uniqement
@@ -95,13 +102,14 @@ def active_count():
 
 
 # POUR DEBUG transitions old-> new valides
-# g_valid_transitions = {
-#     MODE_WAIT : ( MODE_NORMAL,MODE_REMOVED ),
-#     MODE_NORMAL : (MODE_EXPLOSE, MODE_GAMEOVER,),
-#     MODE_EXPLOSE : (MODE_GAMEOVER, MODE_REMOVED,),
-#     MODE_GAMEOVER : (MODE_REMOVED,),
-#     MODE_REMOVED : None
-# }
+g_valid_transitions = {
+    MODE_WAIT : ( MODE_HIDDEN, MODE_NORMAL, MODE_REMOVED ),    # mode initial à lma creation
+    MODE_HIDDEN : (MODE_NORMAL, MODE_REMOVED),
+    MODE_NORMAL : (MODE_EXPLOSE, MODE_GAMEOVER,),
+    MODE_EXPLOSE : (MODE_GAMEOVER, MODE_REMOVED,),
+    MODE_GAMEOVER : (MODE_REMOVED,),
+    MODE_REMOVED : None
+}
 
 
 class AnimatedCircle( pm.Circle ):
@@ -132,7 +140,7 @@ class Fruit( object ):
     def __init__(self, space, kind=0, position=None, mode=MODE_WAIT):
         _new_fruit()
         # espece aléatoire si non spécifiée
-        assert kind<=nb_fruits(), "type de balle invalide"
+        assert kind<=nb_fruits(), "type de fruit inconnu"
         if( kind<=0 ):
             kind = random.randint(1,4)   
         fruit_def = _FRUITS_DEF[kind]
@@ -161,7 +169,7 @@ class Fruit( object ):
         self._fruit_mode = None
         self._dash_start_time = None
         self._set_mode( mode )
-        print( f"{self}" )
+        print( f"{self} created" )
 
 
     def __repr__(self):
@@ -262,7 +270,8 @@ class Fruit( object ):
         fruit =  Fruit( space = self._space,
                      kind=new_kind,
                      position = self._body.position)
-        fruit.fade_in()   # pour passer en mode Body.DYNAMIC
+        fruit.hide()
+        pg.clock.schedule_once( lambda dt : fruit.fade_in(), delay=STAY_HIDDEN_DELAY )
         return fruit
 
 
@@ -294,6 +303,9 @@ class Fruit( object ):
         elif( not self._sprite.blink ):
             self._sprite._blink_start = pg.clock.get_default().time() + delay
 
+    def hide(self):
+        self._set_mode(MODE_HIDDEN)
+
 
     def normal(self):
         """met l'objet en mode dynamique pour qu'il tombe"""
@@ -305,6 +317,7 @@ class Fruit( object ):
     def fade_in(self):
         """ fait apparaitre le sprite avec un effet d'agrandissement et de transparence
         """
+        print( f"{self}.fade_in()")
         self.normal()
         self._sprite.fadein = True
         self._shape.grow_start()
@@ -381,7 +394,6 @@ class CollisionHelper(object):
          self._collisions_fruits = []
          self._actions = {}
 
-
     def collision_fruit( self, arbiter ):
         """ Callback pour pymunk collision_handler
         """
@@ -401,7 +413,6 @@ class CollisionHelper(object):
         # execution différée, l'action peut changer en cas de collision ou autre
         self._actions[id]= lambda : f.blink( activate=False )
         return False  # ignore les collisions avec maxline pour la simu physique
-
 
     def _collision_sets(self):
         """ recherche les composantes connexes dans le graphe des collisions
@@ -424,7 +435,6 @@ class CollisionHelper(object):
         # https://francoisbrucker.github.io/cours_informatique/cours/graphes/chemins-cycles-connexite/
         composantes = []
         already_found = set()
-
         for origine in fruits:
             if origine in already_found:
                 continue

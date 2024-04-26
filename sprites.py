@@ -5,9 +5,9 @@ import utils
 
 pg.resource.path = ['assets/']
 
-VISI_NORMAL = 'aucun'
-VISI_GAMEOVER = 'game_over'
-VISI_HIDDEN = 'hidden'
+VISI_NORMAL = 'visi_normal'
+VISI_GAMEOVER = 'visi_gameover'
+VISI_HIDDEN = 'visi_hidden'
 
 _groups = {
     SPRITE_GROUP_FOND : pg.graphics.Group( order = 0 ),
@@ -94,8 +94,10 @@ class SuikaSprite ( pg.sprite.Sprite ):
     def visibility(self, visi):
         if (visi == VISI_NORMAL):
             self._opacity_ref = 255
+            self.visible = True
         elif(visi == VISI_GAMEOVER ):
             self._opacity_ref = 64
+            self.visible = True
         elif(visi == VISI_HIDDEN ):
             self.visible = False
         else:
