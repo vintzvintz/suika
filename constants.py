@@ -20,7 +20,8 @@ FADEOUT_DELAY = 0.2
 FADEIN_DELAY = 0.3
 FADEIN_OVERSHOOT = 1.1
 FADE_SIZE = 0.2     # ratio pour la taille de départ (resp. fin) du fade-in (resp. fadeout)
-EXPLOSION_DELAY = 0.5
+EXPLOSION_DELAY = 2
+DASHIN_DELAY = EXPLOSION_DELAY
 
 
 # Identifiants pour dispatcher les collisions sur la logique de jeu ( collision_handler )

@@ -30,8 +30,8 @@ class MaxLine( object ):
     
     def fruits_en_contact(self):
         sqi = self._space.shape_query( self._shape )
-        fruit_ids = [ s.shape.fruit_id for s in sqi ]
-        return fruit_ids
+        fruit = [ s.shape.fruit for s in sqi ]
+        return fruit
 
 
 class Walls(object):

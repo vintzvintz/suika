@@ -159,6 +159,7 @@ class Fruit( object ):
         self._sprite_visi = VISI_NORMAL
         self._sprite_explosion = None
         self._fruit_mode = None
+        self._dash_start_time = None
         self._set_mode( mode )
         print( f"{self}" )
 
@@ -176,7 +177,7 @@ class Fruit( object ):
         shape.mass = mass
         shape.friction = FRICTION
         #  ajoute fruit_id comme attribut custom de l'objet pymunk 
-        shape.fruit_id = self._id
+        shape.fruit = self
         return body, shape
 
 
@@ -323,7 +324,16 @@ class Fruit( object ):
             self._sprite.blink = False
 
 
-    def explose(self, target_pos=None):
+    def dash_in(self, dest):
+        self._set_mode( MODE_EXPLOSE )  # plus de collisions avec les fruits
+        (x0, y0) = self._body.position
+        (x1, y1) = dest
+        v = ((x1-x0)/DASHIN_DELAY, (y1-y0)/DASHIN_DELAY)
+        self._body.velocity = v
+        pg.clock.schedule_once(lambda dt : self.remove(), delay=DASHIN_DELAY )
+    
+
+    def explose(self):
         self._set_mode(MODE_EXPLOSE)
         explo = sprites.ExplosionSprite( 
             r=self._shape.radius, 
@@ -344,23 +354,19 @@ class Fruit( object ):
         self._delete()
 
 
-def get_fruit_id(arbiter):
+def get_fruit(arbiter):
 
     # détecte le fruit et la maxline dans la collision
     def is_fruit_shape(shape):
         return shape.collision_type > 0 and shape.collision_type<=nb_fruits()
 
     if( is_fruit_shape( arbiter.shapes[0]) ):
-        return arbiter.shapes[0].fruit_id
+        return arbiter.shapes[0].fruit
     elif ( is_fruit_shape( arbiter.shapes[1])):
-        return arbiter.shapes[1].fruit_id
+        return arbiter.shapes[1].fruit
     else:
         raise RuntimeError( "Collision sans fruit")
 
-
-ACTION_DEBORDE_DEBUT = 'deborde_debut'
-ACTION_DEBORDE_FIN   = 'deborde_fin'
-ACTION_EXPLOSE       = 'explose'
 
 class CollisionHelper(object):
     """ Contient le callback appelé par pymunk pour chaque collision 
@@ -381,17 +387,23 @@ class CollisionHelper(object):
         """
         shapes = arbiter.shapes
         assert( len(shapes)==2 ), " WTF ???"
-        self._collisions_fruits.append( (shapes[0].fruit_id, shapes[1].fruit_id) )
+        self._collisions_fruits.append( (shapes[0].fruit, shapes[1].fruit) )
         return True   # ignore les collisions avec maxline pour la simu physique
 
-    def collision_maxline(self, arbiter, action):
-        assert action in [ACTION_DEBORDE_FIN, ACTION_DEBORDE_DEBUT]
-        id = get_fruit_id(arbiter)
-        self._actions[id]=action
+    def collision_maxline_begin(self, arbiter):
+        f = get_fruit(arbiter)
+        # execution différée, l'action peut changer en cas de collision  avec un autre fruit
+        self._actions[id]= lambda : f.blink( activate=True, delay= BLINK_DELAY )
+        return False  # ignore les collisions avec maxline pour la simu physique
+
+    def collision_maxline_separate(self, arbiter):
+        f = get_fruit(arbiter)
+        # execution différée, l'action peut changer en cas de collision ou autre
+        self._actions[id]= lambda : f.blink( activate=False )
         return False  # ignore les collisions avec maxline pour la simu physique
 
 
-    def _eliminations(self):
+    def _collision_sets(self):
         """ recherche les composantes connexes dans le graphe des collisions
         Le graphe est défini par une liste d'adjacence
         """
@@ -399,11 +411,11 @@ class CollisionHelper(object):
             return []
 
         # ensemble des boules concernées par les collisions à résoudre
-        fruit_ids = set( [pair[0] for pair in self._collisions_fruits] 
-                        +[pair[1] for pair in self._collisions_fruits] )
+        fruits = set( [pair[0] for pair in self._collisions_fruits] 
+                     +[pair[1] for pair in self._collisions_fruits] )
 
         # construit le graphe des boules en contact
-        g = { ball:set() for ball in fruit_ids }
+        g = { f:set() for f in fruits }
         for (a, b) in self._collisions_fruits :
             g[a].add(b)
             g[b].add(a)
@@ -411,17 +423,17 @@ class CollisionHelper(object):
         # recherche les composantes connexes dans le graphe 
         # https://francoisbrucker.github.io/cours_informatique/cours/graphes/chemins-cycles-connexite/
         composantes = []
-        already_found = []
+        already_found = set()
 
-        for origine in fruit_ids:
+        for origine in fruits:
             if origine in already_found:
                 continue
-            already_found.append(origine)
+            already_found.add(origine)
             composante = {origine}
             suivant = [origine]
             while suivant:
                 x = suivant.pop()
-                already_found.append(x)
+                already_found.add(x)
                 for y in g[x]:
                     if y not in composante:
                         composante.add(y)
@@ -430,46 +442,40 @@ class CollisionHelper(object):
         return composantes
 
 
-    def process_collisions(self, fruits, is_gameover):
+    def _process_collisions(self, is_gameover):
         """ modifie les fruits selon collisions apparues pendant pymunk.step()
         """
+        new_fruits = set()
         # traite les explosions 
-        for explose_ids in self._eliminations():
-            assert len( explose_ids ) >= 2, "collision à un seul fruit ???"
-
+        for collision_set in self._collision_sets():
             # liste de Fruit à partir des ids, trié par altitude
-            explose_fruits = [ fruits[id] for id in explose_ids ]
-            explose_fruits.sort(key=lambda f:f.position.y)
+            explose_fruits = sorted( collision_set,  key=lambda f: f.position.y )
+            assert len( explose_fruits ) >= 2, "collision à un seul fruit ???"
 
             # traite uniquement les 2 fruits les plus bas en cas de collision multiple
-            explose_fruits = explose_fruits[0:2]
+            f0 = explose_fruits[0]
+            f1 = explose_fruits[1]
 
+            self._actions[f0] = f0.explose
+            self._actions[f1] = lambda : f1.dash_in( dest=f0.position )
 
             # remplace les fruits explosés par un seul nouveau fruit de taille supérieure
-            #levelup = len(explose_fruits) - 1  
-            new_fruit = explose_fruits[0].create_larger(levelup=1)
+            new_fruit = f0.create_larger(levelup=1)
             if( is_gameover ):
                 new_fruit.gameover()
-            fruits[new_fruit.id] = new_fruit
+            new_fruits.add(new_fruit)
+            print( f"{new_fruit} <--Fusion {[f0, f1]}" )
+        return new_fruits
 
-            print( f"{new_fruit} <--Fusion {explose_fruits}" )
 
-            # marque les fruits supprimés pour explosion
-            # remplace les chgts de  mode sur collisions avec maxline (explosion prioritaire sur débordement)
-            for f in explose_fruits:
-                self._actions[f.id] = ACTION_EXPLOSE
+    def process(self, is_gameover):
+        new_fruits = self._process_collisions(is_gameover=is_gameover)
 
-        # modifie les fruits - l'ordre des actions est important
-        for (id, action) in self._actions.items():
-#            print( f"action {action} pour fruit {id}")
-            if( action==ACTION_EXPLOSE ):
-                fruits[id].explose()
-            elif( action==ACTION_DEBORDE_DEBUT ):
-                fruits[id].blink( activate=True,delay=BLINK_DELAY )
-            elif( action==ACTION_DEBORDE_FIN ):
-                fruits[id].blink( activate=False )
-            else:
-                raise RuntimeError( f"action {action} inconnue")
+        # exectude les actions sur les fruits existants ( explose(), blink(), etc... )
+        for action in self._actions.values():
+            action()
+        self.reset()
+        return new_fruits
 
 
     def setup_handlers(self, space):
@@ -480,5 +486,5 @@ class CollisionHelper(object):
 
         # collisions avec maxline
         h = space.add_wildcard_collision_handler( COLLISION_TYPE_MAXLINE )
-        h.begin = lambda arbiter, space, data : self.collision_maxline(arbiter, ACTION_DEBORDE_DEBUT)
-        h.separate = lambda arbiter, space, data : self.collision_maxline(arbiter, ACTION_DEBORDE_FIN)
+        h.begin = lambda arbiter, space, data : self.collision_maxline_begin(arbiter)
+        h.separate = lambda arbiter, space, data : self.collision_maxline_separate(arbiter)

@@ -91,6 +91,7 @@ class SuikaWindow(pg.window.Window):
             self._next_fruit = None
         self._labels.show_gameover()
 
+
     def autoplay_toggle(self):
             self._is_autoplay = not self._is_autoplay
             if( self._is_autoplay and self._next_fruit):
@@ -103,8 +104,7 @@ class SuikaWindow(pg.window.Window):
     def shoot_fruit(self, x, y):
         qi = self._space.point_query( (x, y), max_distance=0, shape_filter=pm.ShapeFilter() )
         if( len(qi)>0 ):
-            id = qi[0].shape.fruit_id
-            f = self._fruits[id]
+            f = qi[0].shape.fruit
             if( f.is_mode_normal ):
                 f.remove()
                 print(f"shooted {f}")
@@ -115,7 +115,7 @@ class SuikaWindow(pg.window.Window):
         """
         for f in self._fruits.values():
             if f.is_offscreen():
-                print( "WARNING {f} sorti du jeu." )
+                print( f"WARNING {f} sorti du jeu." )
                 f.remove()
 
 
@@ -133,7 +133,9 @@ class SuikaWindow(pg.window.Window):
         # execute 1 pas de simulation physique
         self._space.step( PYMUNK_INTERVAL )  
         # modifie les fruits selon les collisions détectées
-        self._collision_helper.process_collisions( self._fruits, self._is_gameover )
+        new_fruits = self._collision_helper.process( self._is_gameover )
+        # garde une référence sur les fruits créés par les fusions
+        self._fruits.update( {f.id:f for f in new_fruits} )
 
 
     def on_draw(self):
