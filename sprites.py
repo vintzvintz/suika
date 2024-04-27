@@ -6,7 +6,7 @@ import utils
 pg.resource.path = ['assets/']
 
 VISI_NORMAL = 'visi_normal'
-VISI_GAMEOVER = 'visi_gameover'
+#VISI_GAMEOVER = 'visi_gameover'
 VISI_HIDDEN = 'visi_hidden'
 
 _groups = {
@@ -18,7 +18,7 @@ _groups = {
 
 _g_batch = pg.graphics.Batch()   # optimisation pour l'affichage
 
-def group(name):
+def sprite_group(name):
     return _groups[name]
 
 def batch():
@@ -32,7 +32,7 @@ class MaxLineSprite( pg.shapes.Line ):
             x=0, y=height, x2=width, y2=height, width=3, 
             color=(255,20,20), 
             batch=batch(), 
-            group=group(SPRITE_GROUP_GUI) )
+            group=sprite_group(SPRITE_GROUP_GUI) )
         
     def __del__(self):
         pg.shapes.Line.delete()
@@ -95,9 +95,9 @@ class SuikaSprite ( pg.sprite.Sprite ):
         if (visi == VISI_NORMAL):
             self._opacity_ref = 255
             self.visible = True
-        elif(visi == VISI_GAMEOVER ):
-            self._opacity_ref = 64
-            self.visible = True
+        # elif(visi == VISI_GAMEOVER ):
+        #     self._opacity_ref = 64
+        #     self.visible = True
         elif(visi == VISI_HIDDEN ):
             self.visible = False
         else:
@@ -146,20 +146,29 @@ class SuikaSprite ( pg.sprite.Sprite ):
 
         self.scale_x = self._scale_ref[0] * coef_size
         self.scale_y = self._scale_ref[1] * coef_size
-        self.opacity = int(self._opacity_ref  * coef_opacity)
+        if( hasattr( self, '_opacity_ref') ):
+            self.opacity = int(self._opacity_ref  * coef_opacity)
 
 
 class FruitSprite( SuikaSprite ):
     #def _make_sprite(self, nom, radius):
-    def __init__(self, nom, r):
+    def __init__(self, nom, r, group=None):
         """  sprite pyglet associé à l'objet physique
         """
+        if( group is None ):
+            group = sprite_group(SPRITE_GROUP_FRUITS)
         img = pg.resource.image( f"{nom}.png" )
         img.anchor_x = img.width // 2                 # ancrage au centre de l'image
         img.anchor_y = img.height // 2
         self._scale_ref = (2 * r / img.width,  2 * r / img.height)
 
-        super().__init__(img=img, batch=batch(), group=group(SPRITE_GROUP_FRUITS),   )
+        super().__init__(img=img, batch=batch(), group=group )
+
+
+class PreviewSprite( FruitSprite ):
+    def __init__(self, nom ):
+        super().__init__(nom, r=50, group=sprite_group(SPRITE_GROUP_GUI))
+
 
 
 ## Explosion
@@ -214,7 +223,7 @@ class ExplosionSprite( SuikaSprite ):
     def _make_animated_sprite(self, r):
         super().__init__(img=self._make_animation(),
                          batch = batch(),
-                         group=group(SPRITE_GROUP_EXPLOSIONS))
+                         group=sprite_group(SPRITE_GROUP_EXPLOSIONS))
         self.opacity=128
 
 

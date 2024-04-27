@@ -5,8 +5,10 @@ import pymunk as pm
 
 from constants import *
 import utils
-import sprites
-from sprites import VISI_NORMAL, VISI_GAMEOVER, VISI_HIDDEN
+
+from sprites import VISI_NORMAL, VISI_HIDDEN
+from sprites import PreviewSprite, FruitSprite, ExplosionSprite
+
 
 
 _FRUITS_DEF = [
@@ -36,6 +38,10 @@ MODE_EXPLOSE = 'explose'
 MODE_GAMEOVER = 'gameover'
 MODE_REMOVED = 'removed'
 
+SPRITE_PREVIEW='sprite_preview'
+SPRITE_MAIN = "sprite_main"
+SPRITE_EXPLOSION = "sprite_explosion"
+
 COLLISION_CAT = 'coll_cat'
 COLLISION_MASK = 'coll_mask'
 BODY_TYPE = 'body_type'
@@ -63,7 +69,7 @@ _FRUIT_MODES = {
     MODE_GAMEOVER: {
         COLLISION_CAT: CAT_FRUIT,
         COLLISION_MASK: CAT_FRUIT,
-        VISI: VISI_GAMEOVER,
+        VISI: VISI_NORMAL,
         BODY_TYPE: pm.Body.DYNAMIC
     },
     MODE_EXPLOSE: {
@@ -103,13 +109,17 @@ def active_count():
 
 # POUR DEBUG transitions old-> new valides
 g_valid_transitions = {
-    MODE_WAIT : ( MODE_HIDDEN, MODE_NORMAL, MODE_REMOVED ),    # mode initial à lma creation
+    MODE_WAIT : ( MODE_HIDDEN, MODE_NORMAL, MODE_REMOVED ),    # mode initial à la creation
     MODE_HIDDEN : (MODE_NORMAL, MODE_REMOVED),
     MODE_NORMAL : (MODE_EXPLOSE, MODE_GAMEOVER,),
     MODE_EXPLOSE : (MODE_GAMEOVER, MODE_REMOVED,),
     MODE_GAMEOVER : (MODE_REMOVED,),
     MODE_REMOVED : None
 }
+
+
+def random_kind():
+    return random.randint( 1, 4 )
 
 
 class AnimatedCircle( pm.Circle ):
@@ -142,7 +152,7 @@ class Fruit( object ):
         # espece aléatoire si non spécifiée
         assert kind<=nb_fruits(), "type de fruit inconnu"
         if( kind<=0 ):
-            kind = random.randint(1,4)   
+            kind = random_kind()
         fruit_def = _FRUITS_DEF[kind]
 
         # position par défaut
@@ -161,11 +171,11 @@ class Fruit( object ):
         self._shape.collision_type = kind
         space.add(self._body, self._shape)
 
-        self._sprite = sprites.FruitSprite( 
-            nom=fruit_def['name'], 
-            r=fruit_def['radius'] )
-        self._sprite_visi = VISI_NORMAL
-        self._sprite_explosion = None
+        self._sprites = { 
+            SPRITE_MAIN : FruitSprite( 
+                nom=fruit_def['name'], 
+                r=fruit_def['radius'])
+        }
         self._fruit_mode = None
         self._dash_start_time = None
         self._set_mode( mode )
@@ -199,13 +209,11 @@ class Fruit( object ):
             self._body = self._shape = None
         
         # remove sprite from pyglet graphics batch
-        if( self._sprite ):
-            self._sprite.delete()
-            self._sprite = None
-
-        if( self._sprite_explosion ):
-            self._sprite_explosion.delete()
-            self._sprite_explosion = None
+        if self._sprites:
+            for k in list(self._sprites.keys()) :
+                if self._sprites[k]: 
+                    self._sprites[k].delete()
+        self._sprites = None
 
 
     def __del__(self):
@@ -240,9 +248,8 @@ class Fruit( object ):
 
     def _is_deleted(self):
         return (self._body==None 
-            and self._sprite==None 
             and self._shape==None
-            and self._sprite_explosion==None)
+            and self._sprites==None )
 
 
     def _set_mode(self, mode):
@@ -257,7 +264,10 @@ class Fruit( object ):
 
         # DYNAMIC ou KINEMATIC
         self._body.body_type = attrs[BODY_TYPE]
-        self._sprite.visibility = attrs[VISI]
+
+        # sprites visibility
+        for s in self._sprites.values( ):
+            s.visibility = attrs[VISI]
 
         # modifie les règkes de collision
         self._shape.filter = pm.ShapeFilter(
@@ -282,36 +292,48 @@ class Fruit( object ):
             return
         (x, y) = self._body.position
         degres = -180/3.1416 * self._body.angle  # pymunk et pyglet ont un sens de rotation opposé
-        self._sprite.update( x=x, y=y, rotation=degres,
-                             on_animation_stop=None )
+        for s in self._sprites.values():
+            s.update( x=x, y=y, rotation=degres, on_animation_stop=None )
         self._shape.update_animation()
         
 
-    def set_x(self, x):
+    def set_position(self, x, y):
         assert( self._body.body_type == pm.Body.KINEMATIC ), "disponible seulement sur le fruit en attente"
+        assert( not y or (y>0 and y<WINDOW_HEIGHT))
         # contrainte à l'interieur du jeu
         x = max(x, self._shape.radius )
         x = min(x, WINDOW_WIDTH - self._shape.radius)
         (x0, y0) = self._body.position
-        self._body.position = ( x, y0 )
-        self._sprite.position = ( x, y0, 0 )
+        if y is None:
+            y = y0
+        self._body.position = ( x, y )
+        #self._sprite.position = ( x, y0, 0 )
 
+
+    def preview(self, position):
+        self._set_mode(MODE_HIDDEN)
+        nom = _FRUITS_DEF[self._kind]
+        s = PreviewSprite(nom=nom)
+        self._sprites[SPRITE_PREVIEW] = s
 
     def blink(self, activate, delay=0):
         if(not activate):
-            self._sprite._blink_start = None
-        elif( not self._sprite.blink ):
-            self._sprite._blink_start = pg.clock.get_default().time() + delay
+            self._sprite[SPRITE_MAIN].blink = False
+        elif( not self._sprite[SPRITE_MAIN].blink ):
+            self._sprite[SPRITE_MAIN].blink = True
+
 
     def hide(self):
         self._set_mode(MODE_HIDDEN)
 
 
     def normal(self):
-        """met l'objet en mode dynamique pour qu'il tombe"""
-        assert not (self._kind is None)
+        """met l'objet en mode dynamique pour qu'il tombe et active les collisions"""
         assert( self._body.body_type == pm.Body.KINEMATIC )
         self._set_mode( MODE_NORMAL )
+        if( SPRITE_PREVIEW in self._sprites ):
+            self._sprites[SPRITE_PREVIEW].delete()
+            del self._sprites[SPRITE_PREVIEW]
 
 
     def fade_in(self):
@@ -319,14 +341,14 @@ class Fruit( object ):
         """
         print( f"{self}.fade_in()")
         self.normal()
-        self._sprite.fadein = True
+        self._sprites[SPRITE_MAIN].fadein = True
         self._shape.grow_start()
 
 
     def fade_out(self):
         assert( self._body.body_type == pm.Body.KINEMATIC )
         self.normal()
-        self._sprite.fadeout = True
+        self._sprite[SPRITE_MAIN].fadeout = True
 
 
     def gameover(self):
@@ -348,12 +370,12 @@ class Fruit( object ):
 
     def explose(self):
         self._set_mode(MODE_EXPLOSE)
-        explo = sprites.ExplosionSprite( 
+        explo = ExplosionSprite( 
             r=self._shape.radius, 
             on_explosion_end=self.remove)
         explo.position = ( *self._body.position, 1)
-        self._sprite_explosion = explo
-        self._sprite.fadeout = True
+        self._sprites[SPRITE_EXPLOSION] = explo
+        self._sprites[SPRITE_MAIN].fadeout = True
 
     def is_offscreen(self) -> bool :
         if self._is_deleted():

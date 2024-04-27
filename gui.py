@@ -7,7 +7,7 @@ TOP_CENTER = 'label2'
 TOP_RIGHT = 'label3'
 GAME_OVER = 'gameover'
 
-_sprite_group = sprites.group(SPRITE_GROUP_GUI)
+_sprite_group = sprites.sprite_group(SPRITE_GROUP_GUI)
 
 class Labels(object):
 
