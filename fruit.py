@@ -31,14 +31,11 @@ _FRUITS_DEF = [
 def nb_fruits():
     return len(_FRUITS_DEF) - 1
 
-MODE_HIDDEN = 'hidden'
 MODE_WAIT = 'wait'
 MODE_NORMAL = 'normal'
-MODE_EXPLOSE = 'explose'
-MODE_GAMEOVER = 'gameover'
+MODE_MERGE = 'merge'
 MODE_REMOVED = 'removed'
 
-SPRITE_PREVIEW='sprite_preview'
 SPRITE_MAIN = "sprite_main"
 SPRITE_EXPLOSION = "sprite_explosion"
 
@@ -48,12 +45,6 @@ BODY_TYPE = 'body_type'
 VISI = 'visi'
 
 _FRUIT_MODES = {
-    MODE_HIDDEN: {
-        COLLISION_CAT: CAT_FRUIT_WAIT,
-        COLLISION_MASK: 0x00, # collision avec les murs uniqement
-        VISI: VISI_HIDDEN,
-        BODY_TYPE: pm.Body.KINEMATIC
-    },
     MODE_WAIT: {
         COLLISION_CAT: CAT_FRUIT_WAIT,
         COLLISION_MASK: 0x00, # collision avec les murs uniqement
@@ -66,13 +57,7 @@ _FRUIT_MODES = {
         VISI: VISI_NORMAL,
         BODY_TYPE: pm.Body.DYNAMIC
     },
-    MODE_GAMEOVER: {
-        COLLISION_CAT: CAT_FRUIT,
-        COLLISION_MASK: CAT_FRUIT,
-        VISI: VISI_NORMAL,
-        BODY_TYPE: pm.Body.DYNAMIC
-    },
-    MODE_EXPLOSE: {
+    MODE_MERGE: {
         COLLISION_CAT: CAT_FRUIT_EXPLOSE,
         COLLISION_MASK: 0x00,   # collision avec les murs uniqement
         VISI: VISI_NORMAL,
@@ -93,33 +78,35 @@ def _get_new_id():
     _g_fruit_id +=1
     return _g_fruit_id
 
-_g_fruit_cnt = 0
-def _new_fruit():
-    global _g_fruit_cnt
-    _g_fruit_cnt += 1
+g_fruit_cnt = utils.RessourceCounter("Fruit")
+# def _new_fruit():
+#     global _g_fruit_cnt
+#     _g_fruit_cnt += 1
 
-def _del_fruit():
-    global _g_fruit_cnt
-    _g_fruit_cnt -= 1
+# def _del_fruit():
+#     global _g_fruit_cnt
+#     _g_fruit_cnt -= 1
 
-def active_count():
-    global _g_fruit_cnt
-    return _g_fruit_cnt
+# def active_count():
+#     global _g_fruit_cnt
+#     return _g_fruit_cnt
 
 
 # POUR DEBUG transitions old-> new valides
 g_valid_transitions = {
-    MODE_WAIT : ( MODE_HIDDEN, MODE_NORMAL, MODE_REMOVED ),    # mode initial à la creation
-    MODE_HIDDEN : (MODE_NORMAL, MODE_REMOVED),
-    MODE_NORMAL : (MODE_EXPLOSE, MODE_GAMEOVER,),
-    MODE_EXPLOSE : (MODE_GAMEOVER, MODE_REMOVED,),
-    MODE_GAMEOVER : (MODE_REMOVED,),
+    MODE_WAIT : ( MODE_NORMAL, MODE_REMOVED ),    # mode initial à la creation
+
+    MODE_NORMAL : (MODE_MERGE, MODE_REMOVED),
+    MODE_MERGE : ( MODE_REMOVED,),
     MODE_REMOVED : None
 }
 
 
 def random_kind():
     return random.randint( 1, 4 )
+
+def name_from_kind(kind):
+    return _FRUITS_DEF[kind]["name"]
 
 
 class AnimatedCircle( pm.Circle ):
@@ -128,10 +115,10 @@ class AnimatedCircle( pm.Circle ):
         self._grow_start = None
         self._radius_ref = self.radius
     
-    def grow_start( self, coef_start=FADE_SIZE ):
+    def grow_start( self ):
         """lance une animation qui fait varier le rayon en fonction du temps
         """
-        if( not hasattr(self, '_grow_start') or self._grow_start is None ):  # lazy initialisation
+        if( self._grow_start is None ):
             self._grow_start = utils.now()
 
     def update_animation(self):
@@ -147,8 +134,8 @@ class AnimatedCircle( pm.Circle ):
 
 
 class Fruit( object ):
-    def __init__(self, space, kind=0, position=None, mode=MODE_WAIT):
-        _new_fruit()
+    def __init__(self, space, on_remove=None, kind=0, position=None, mode=MODE_WAIT):
+        g_fruit_cnt.inc()
         # espece aléatoire si non spécifiée
         assert kind<=nb_fruits(), "type de fruit inconnu"
         if( kind<=0 ):
@@ -164,6 +151,7 @@ class Fruit( object ):
         self._id = _get_new_id()
         self._kind = kind
         self._space = space
+        self._on_remove = on_remove
         self._body, self._shape = self._make_shape(
             radius=fruit_def['radius'],
             mass=fruit_def['mass'], 
@@ -179,7 +167,7 @@ class Fruit( object ):
         self._fruit_mode = None
         self._dash_start_time = None
         self._set_mode( mode )
-        print( f"{self} created" )
+        print( f"{self}.__init__()" )
 
 
     def __repr__(self):
@@ -199,7 +187,8 @@ class Fruit( object ):
         return body, shape
 
 
-    def _delete(self):
+    def release_ressources(self):
+
         if( not self.removed ):
             print( f"WARNING: {self} delete() avec mode différent de MODE_REMOVED ({self._fruit_mode})" )
         # remove pymunk objects and local references
@@ -207,24 +196,25 @@ class Fruit( object ):
             #print( f"{self}.delete()")
             self._space.remove( self._body, self._shape )
             self._body = self._shape = None
-        
-        # remove sprite from pyglet graphics batch
-        if self._sprites:
-            for k in list(self._sprites.keys()) :
-                if self._sprites[k]: 
-                    self._sprites[k].delete()
-        self._sprites = None
+
+        self._sprites = {}   # should call sprite.delete() ...
 
 
     def __del__(self):
-        _del_fruit()
+        g_fruit_cnt.dec()
         #print( f"__del__({self})")
-        self._delete()
-
+        assert(    self._body is None 
+               and self._shape is None 
+               and len(self._sprites)==0
+               and self._fruit_mode == MODE_REMOVED), "ressources non libérées"
 
     @property
     def id(self):
         return self._id
+
+    @property
+    def kind(self):
+        return self._kind
 
     @property
     def scalar_velocity(self):
@@ -233,10 +223,6 @@ class Fruit( object ):
     @property
     def points(self):
         return self._kind
-    
-    @property
-    def is_mode_normal(self):
-        return self._fruit_mode == MODE_NORMAL
 
     @property
     def removed(self):
@@ -259,6 +245,9 @@ class Fruit( object ):
         # if( old and mode not in g_valid_transitions[old] ):
         #     log += " INVALIDE"
         # print(log)
+        if(self.removed):
+            return
+
         self._fruit_mode = mode
         attrs = _FRUIT_MODES[self._fruit_mode]
 
@@ -275,20 +264,10 @@ class Fruit( object ):
             mask = attrs[COLLISION_MASK] | CAT_WALLS )  # collision systematique avec les murs
 
 
-    def create_larger( self, levelup ):
-        new_kind = min( self._kind + levelup, nb_fruits() )
-        fruit =  Fruit( space = self._space,
-                     kind=new_kind,
-                     position = self._body.position)
-        fruit.hide()
-        pg.clock.schedule_once( lambda dt : fruit.fade_in(), delay=STAY_HIDDEN_DELAY )
-        return fruit
-
-
     def update(self):
         """met à jour le sprite du fruit à partir de la simulation physique et autres
         """
-        if( self._is_deleted() ):
+        if( self.removed or self._is_deleted() ):
             return
         (x, y) = self._body.position
         degres = -180/3.1416 * self._body.angle  # pymunk et pyglet ont un sens de rotation opposé
@@ -307,39 +286,27 @@ class Fruit( object ):
         if y is None:
             y = y0
         self._body.position = ( x, y )
-        #self._sprite.position = ( x, y0, 0 )
 
 
-    def preview(self, position):
-        self._set_mode(MODE_HIDDEN)
-        nom = _FRUITS_DEF[self._kind]
-        s = PreviewSprite(nom=nom)
-        self._sprites[SPRITE_PREVIEW] = s
 
     def blink(self, activate, delay=0):
         if(not activate):
-            self._sprite[SPRITE_MAIN].blink = False
-        elif( not self._sprite[SPRITE_MAIN].blink ):
-            self._sprite[SPRITE_MAIN].blink = True
-
-
-    def hide(self):
-        self._set_mode(MODE_HIDDEN)
+            self._sprites[SPRITE_MAIN].blink = False
+        elif( not self._sprites[SPRITE_MAIN].blink ):
+            self._sprites[SPRITE_MAIN].blink = True
 
 
     def normal(self):
         """met l'objet en mode dynamique pour qu'il tombe et active les collisions"""
-        assert( self._body.body_type == pm.Body.KINEMATIC )
         self._set_mode( MODE_NORMAL )
-        if( SPRITE_PREVIEW in self._sprites ):
-            self._sprites[SPRITE_PREVIEW].delete()
-            del self._sprites[SPRITE_PREVIEW]
 
 
     def fade_in(self):
         """ fait apparaitre le sprite avec un effet d'agrandissement et de transparence
         """
-        print( f"{self}.fade_in()")
+        if(self.removed):
+            return
+        #print( f"{self}.fade_in()")
         self.normal()
         self._sprites[SPRITE_MAIN].fadein = True
         self._shape.grow_start()
@@ -351,25 +318,21 @@ class Fruit( object ):
         self._sprite[SPRITE_MAIN].fadeout = True
 
 
-    def gameover(self):
-        if( not self.removed ):
-            self._set_mode(MODE_GAMEOVER)
-            self._sprite.fadein = False
-            self._sprite.fadeout = False
-            self._sprite.blink = False
-
-
-    def dash_in(self, dest):
-        self._set_mode( MODE_EXPLOSE )  # plus de collisions avec les fruits
+    def merge_to(self, dest):
+        if( self._fruit_mode==MODE_MERGE):
+            return
+        self._set_mode( MODE_MERGE )  # plus de collisions avec les fruits
         (x0, y0) = self._body.position
         (x1, y1) = dest
-        v = ((x1-x0)/DASHIN_DELAY, (y1-y0)/DASHIN_DELAY)
+        v = ((x1-x0)/MERGE_DELAY, (y1-y0)/MERGE_DELAY)
         self._body.velocity = v
-        pg.clock.schedule_once(lambda dt : self.remove(), delay=DASHIN_DELAY )
+        pg.clock.schedule_once(lambda dt : self.remove(), delay=MERGE_DELAY )
     
 
     def explose(self):
-        self._set_mode(MODE_EXPLOSE)
+        if( self._fruit_mode==MODE_MERGE):
+            return
+        self._set_mode(MODE_MERGE)
         explo = ExplosionSprite( 
             r=self._shape.radius, 
             on_explosion_end=self.remove)
@@ -385,8 +348,11 @@ class Fruit( object ):
     
     # retire le fruit du jeu. l'objet ne doit plus être utilisé ensuite.
     def remove(self):
+        # callback optionnel ( ex: gestion du score )
+        if(self._on_remove ):
+            self._on_remove( self )
         self._set_mode(MODE_REMOVED)
-        self._delete()
+        self.release_ressources()
 
 
 def get_fruit(arbiter):
@@ -474,10 +440,9 @@ class CollisionHelper(object):
         return composantes
 
 
-    def _process_collisions(self, is_gameover):
+    def _process_collisions(self, spawn_func):
         """ modifie les fruits selon collisions apparues pendant pymunk.step()
         """
-        new_fruits = set()
         # traite les explosions 
         for collision_set in self._collision_sets():
             # liste de Fruit à partir des ids, trié par altitude
@@ -487,27 +452,31 @@ class CollisionHelper(object):
             # traite uniquement les 2 fruits les plus bas en cas de collision multiple
             f0 = explose_fruits[0]
             f1 = explose_fruits[1]
+            assert( f0.kind == f1.kind )
 
+
+
+            print( f"Fusion {[f0, f1]}" )
             self._actions[f0] = f0.explose
-            self._actions[f1] = lambda : f1.dash_in( dest=f0.position )
+            self._actions[f1] = lambda : f1.merge_to( dest=f0.position )
 
             # remplace les fruits explosés par un seul nouveau fruit de taille supérieure
-            new_fruit = f0.create_larger(levelup=1)
-            if( is_gameover ):
-                new_fruit.gameover()
-            new_fruits.add(new_fruit)
-            print( f"{new_fruit} <--Fusion {[f0, f1]}" )
-        return new_fruits
+            # copie les infos car f0 peut être REMOVED quand spawn() sera appelée
+            kind = min( f0.kind + 1, nb_fruits() )
+            position = f0.position
+            spawn_fruit = lambda dt : spawn_func(kind=kind, position=position ) 
+            pg.clock.schedule_once( spawn_fruit, delay=SPAWN_DELAY )
 
 
-    def process(self, is_gameover):
-        new_fruits = self._process_collisions(is_gameover=is_gameover)
+
+
+    def process(self, spawn_func):
+        self._process_collisions(spawn_func)
 
         # exectude les actions sur les fruits existants ( explose(), blink(), etc... )
         for action in self._actions.values():
             action()
         self.reset()
-        return new_fruits
 
 
     def setup_handlers(self, space):

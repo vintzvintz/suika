@@ -11,7 +11,9 @@ _sprite_group = sprites.sprite_group(SPRITE_GROUP_GUI)
 
 class Labels(object):
 
-    def __init__( self, window_width, window_height, top_margin=10, font_size=20, font_name="Arial" ):
+    def __init__( self, window_width, window_height, 
+                 top_margin=GUI_TOP_MARGIN, font_size=GUI_FONT_SIZE, 
+                 font_name="Arial" ):
 
         # textes en haut 
         self._labels = {

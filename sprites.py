@@ -6,7 +6,6 @@ import utils
 pg.resource.path = ['assets/']
 
 VISI_NORMAL = 'visi_normal'
-#VISI_GAMEOVER = 'visi_gameover'
 VISI_HIDDEN = 'visi_hidden'
 
 _groups = {
@@ -24,6 +23,9 @@ def sprite_group(name):
 def batch():
     return _g_batch
 
+
+g_fruit_sprite_cnt = utils.RessourceCounter("FruitSprites")
+g_preview_sprite_cnt = utils.RessourceCounter("PreviewSprites")
 
 # Ligne rouge de niveau maxi
 class MaxLineSprite( pg.shapes.Line ):
@@ -46,7 +48,10 @@ class SuikaSprite ( pg.sprite.Sprite ):
         self._fadein_start = None 
         self._fadeout_start = None
         self._visibility = VISI_NORMAL
-    
+
+    def __del__(self):
+        self.delete()              # removes sprite from pyglet graphics batch
+        super().__del__()
 
     @property
     def fadein(self):
@@ -95,9 +100,6 @@ class SuikaSprite ( pg.sprite.Sprite ):
         if (visi == VISI_NORMAL):
             self._opacity_ref = 255
             self.visible = True
-        # elif(visi == VISI_GAMEOVER ):
-        #     self._opacity_ref = 64
-        #     self.visible = True
         elif(visi == VISI_HIDDEN ):
             self.visible = False
         else:
@@ -132,7 +134,7 @@ class SuikaSprite ( pg.sprite.Sprite ):
             t = utils.now() - self._fadeout_start
             a =  (FADEOUT_DELAY - t) / FADEOUT_DELAY
             if( a < 0 ):
-                #self.fadeout = False   # ne supprime pas l'effst sinon le sprite reapparait
+                #self.fadeout = False   # ne supprime pas l'effet sinon le sprite reapparait
                 if( on_animation_stop ):
                     on_animation_stop()
             coef_size = max(0.2, a)
@@ -151,10 +153,10 @@ class SuikaSprite ( pg.sprite.Sprite ):
 
 
 class FruitSprite( SuikaSprite ):
-    #def _make_sprite(self, nom, radius):
     def __init__(self, nom, r, group=None):
         """  sprite pyglet associé à l'objet physique
         """
+        g_fruit_sprite_cnt.inc()
         if( group is None ):
             group = sprite_group(SPRITE_GROUP_FRUITS)
         img = pg.resource.image( f"{nom}.png" )
@@ -164,10 +166,22 @@ class FruitSprite( SuikaSprite ):
 
         super().__init__(img=img, batch=batch(), group=group )
 
+    def __del__(self):
+        g_fruit_sprite_cnt.dec()
+        super().__del__()
+
 
 class PreviewSprite( FruitSprite ):
-    def __init__(self, nom ):
-        super().__init__(nom, r=50, group=sprite_group(SPRITE_GROUP_GUI))
+    def __init__(self, nom, width=PREVIEW_SPRITE_SIZE ):
+        g_preview_sprite_cnt.inc()
+        super().__init__(nom, r=width/2, group=sprite_group(SPRITE_GROUP_GUI))
+
+    def update(self, x, y):
+         super().update( x=x, y=y, rotation=0, on_animation_stop=None )
+
+    def __del__(self):
+        g_preview_sprite_cnt.dec()
+        super().__del__()
 
 
 

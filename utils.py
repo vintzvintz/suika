@@ -31,10 +31,10 @@ class CountDown(object):
             print( "countdown start")
             self._start_time = now()  # ne remet pas à zero si déja en cours
         elif( not deborde ):
-            self._start_time = None
             #debug
             if( self._start_time ):
                 print( "countdown stop")
+            self._start_time = None
 
     def status(self):
         """ Renvoie un tuple (t, texte)
@@ -47,5 +47,29 @@ class CountDown(object):
         t = self._start_time + GAMEOVER_DELAY - now()
         text = ""
         if( t <  COUNTDOWN_DISPLAY_LIMIT ):
-            text = f"Defaite dans {t:.02f}s"
+            text = f"Defaite dans {t:.01f}s"
         return (t, text)
+
+
+class RessourceCounter(object):
+    """Pour vérifier que toutes les ressources sont bien libérées
+    """
+    def __init__(self, nom):
+        self._cnt = 0
+        self.nom = nom
+
+    def __del__(self):
+        print( f"{self} __del__()" )
+
+    def __repr__(self):
+        return( f"Compteur '{self.nom}' = {self._cnt}")
+
+    def inc(self):
+        self._cnt += 1
+
+    def dec(self):
+        self._cnt -=1
+
+    @property
+    def cnt(self): 
+        return self._cnt

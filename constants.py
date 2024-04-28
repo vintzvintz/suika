@@ -1,7 +1,16 @@
 
 WINDOW_HEIGHT = 1500
-WINDOW_MAXLINE_MARGIN = 250
+WINDOW_MAXLINE_MARGIN = 1100
 WINDOW_WIDTH  = 1000
+
+GUI_FONT_SIZE = 25
+GUI_TOP_MARGIN = 10
+
+PREVIEW_Y_POS = WINDOW_HEIGHT - 90
+PREVIEW_SPRITE_SIZE = 50
+PREVIEW_SLOT_SIZE = 70
+PREVIEW_COUNT = 4
+
 
 PYMUNK_INTERVAL = 1 / 120.0     # physics engine steps per sec.
 FRICTION = 1.0
@@ -21,8 +30,8 @@ FADEIN_DELAY = 0.08
 FADEIN_OVERSHOOT = 1.15
 FADE_SIZE = 0.2           # ratio pour la taille de départ (resp. fin) du fade-in (resp. fadeout)
 EXPLOSION_DELAY = 0.3
-DASHIN_DELAY = 0.1
-STAY_HIDDEN_DELAY = 0.3
+MERGE_DELAY = 0.1
+SPAWN_DELAY = 0.3
 
 # Identifiants pour dispatcher les collisions sur la logique de jeu ( collision_handler )
 
@@ -42,3 +51,4 @@ SPRITE_GROUP_FOND = 'fond'
 SPRITE_GROUP_FRUITS = 'fruit'
 SPRITE_GROUP_EXPLOSIONS = 'explosions'
 SPRITE_GROUP_GUI = 'gui'
+
