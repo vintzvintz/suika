@@ -167,7 +167,8 @@ class Fruit( object ):
         self._fruit_mode = None
         self._dash_start_time = None
         self._set_mode( mode )
-        print( f"{self}.__init__()" )
+        #print( f"{self}.__init__()" )
+        print( f"{self} created" )
 
 
     def __repr__(self):

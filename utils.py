@@ -28,12 +28,12 @@ class CountDown(object):
 
     def update(self, deborde):
         if( deborde and not self._start_time ):
-            print( "countdown start")
+            #print( "countdown start")
             self._start_time = now()  # ne remet pas à zero si déja en cours
         elif( not deborde ):
             #debug
-            if( self._start_time ):
-                print( "countdown stop")
+            #if( self._start_time ):
+            #    print( "countdown stop")
             self._start_time = None
 
     def status(self):
