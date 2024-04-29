@@ -13,8 +13,10 @@ PREVIEW_COUNT = 4
 
 
 PYMUNK_INTERVAL = 1 / 120.0     # physics engine steps per sec.
-FRICTION = 1.0
+FRICTION = 0.50
 GRAVITY = 9.81
+INITIAL_VELOCITY = 1000
+
 
 NEXT_FRUIT_INTERVAL = 0.2
 AUTOPLAY_INTERVAL = 0.5
@@ -36,15 +38,19 @@ SPAWN_DELAY = 0.3
 # Identifiants pour dispatcher les collisions sur la logique de jeu ( collision_handler )
 
 # COLLISION_TYPE_*fruits*  définis implicitement (entiers inférieurs à 1000)
-COLLISION_TYPE_MAXLINE = 1000
+COLLISION_TYPE_WALL_BOTTOM = 1000
+COLLISION_TYPE_WALL_SIDE = 1001
+COLLISION_TYPE_MAXLINE = 1002
+COLLISION_TYPE_FIRST_DROP = 1003
 
 # catégories pour la creation des collisions
 CAT_WALLS          = 1 << 0
 CAT_MAXLINE        = 1 << 1
 CAT_FRUIT_WAIT     = 1 << 2
-CAT_FRUIT          = 1 << 3
-CAT_FRUIT_EXPLOSE  = 1 << 4
-CAT_FRUIT_REMOVED  = 1 << 5
+CAT_FRUIT_DROP     = 1 << 3
+CAT_FRUIT          = 1 << 4
+CAT_FRUIT_MERGE    = 1 << 5
+CAT_FRUIT_REMOVED  = 1 << 6
 
 
 SPRITE_GROUP_FOND = 'fond'

@@ -39,11 +39,13 @@ class Walls(object):
     def __init__(self, space, width, height):
         body = pm.Body(body_type=pm.Body.STATIC)
         body.position = (0, 0)
-        walls = [
-            pm.Segment(body, (0, 0), (0, height+500), 1),          # left
-            pm.Segment(body, (0, 0), (width, 0), 1),              # bottom
-            pm.Segment(body, (width, 0), (width, height+500), 1)   # right
-        ]
+        wall_left = pm.Segment(body, (0, 0), (0, height+500), 1)          # left
+        wall_bottom = pm.Segment(body, (0, 0), (width, 0), 1)              # bottom
+        wall_right = pm.Segment(body, (width, 0), (width, height+500), 1)   # right
+        wall_bottom.collision_type = COLLISION_TYPE_WALL_BOTTOM
+        wall_left.collision_type = COLLISION_TYPE_WALL_SIDE
+        wall_right.collision_type = COLLISION_TYPE_WALL_SIDE
+        walls = [wall_bottom, wall_left, wall_right]
         for s in walls:
             s.friction = FRICTION
             s.filter = pm.ShapeFilter( 

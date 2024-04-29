@@ -54,8 +54,7 @@ class ActiveFruits(object):
     def play_next(self, x):
         if( (not self._next_fruit) or self._is_gameover ):
             return
-        self._next_fruit.set_position( x=x, y=None )
-        self._next_fruit.normal()
+        self._next_fruit.drop(x=x)
         self.add( self._next_fruit )
         self._next_fruit = None
 
@@ -83,8 +82,7 @@ class ActiveFruits(object):
         for _ in range(nb):
             f = Fruit( self._space, on_remove=self.on_remove )
             self.add(f)
-            f.set_position(x=random.randint(0, WINDOW_WIDTH), y=None)
-            f.normal()
+            f.drop(x=random.randint(0, WINDOW_WIDTH))
 
     def spawn(self, kind, position):
         f =  Fruit( space = self._space,
