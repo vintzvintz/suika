@@ -12,7 +12,8 @@ _groups = {
     SPRITE_GROUP_FOND : pg.graphics.Group( order = 0 ),
     SPRITE_GROUP_FRUITS : pg.graphics.Group( order = 1 ),
     SPRITE_GROUP_EXPLOSIONS : pg.graphics.Group( order = 2 ),
-    SPRITE_GROUP_GUI : pg.graphics.Group( order = 3 )
+    SPRITE_GROUP_MASQUE : pg.graphics.Group( order = 3 ),
+    SPRITE_GROUP_GUI : pg.graphics.Group( order = 4 )
 }
 
 _g_batch = pg.graphics.Batch()   # optimisation pour l'affichage

@@ -7,7 +7,8 @@ TOP_CENTER = 'label2'
 TOP_RIGHT = 'label3'
 GAME_OVER = 'gameover'
 
-_sprite_group = sprites.sprite_group(SPRITE_GROUP_GUI)
+_group_gui = sprites.sprite_group(SPRITE_GROUP_GUI)
+_group_masque = sprites.sprite_group(SPRITE_GROUP_MASQUE)
 
 class Labels(object):
 
@@ -21,17 +22,17 @@ class Labels(object):
                           font_name=font_name, font_size=font_size,
                           x=top_margin, y=window_height - top_margin,
                           anchor_x='left', anchor_y='top',
-                          batch=sprites.batch(),group=_sprite_group),
+                          batch=sprites.batch(),group=_group_gui),
             TOP_CENTER: pg.text.Label('---',
                           font_name=font_name, font_size=font_size,
                           x=window_width//2, y=window_height - top_margin,
                           anchor_x='center', anchor_y='top',
-                          batch=sprites.batch(),group=_sprite_group),
+                          batch=sprites.batch(),group=_group_gui),
             TOP_RIGHT: pg.text.Label('---',
                           font_name=font_name, font_size=font_size,
                           x=window_width - top_margin, y=window_height - top_margin,
                           anchor_x='right', anchor_y='top',
-                          batch=sprites.batch(), group=_sprite_group),
+                          batch=sprites.batch(), group=_group_gui),
         }
 
         # image GAME OVER
@@ -40,11 +41,18 @@ class Labels(object):
         img.anchor_y = img.height // 2
         ratio_x = window_width / img.width
         ratio_y = window_height / img.height
-        self._gameover = pg.sprite.Sprite( img=img, batch=sprites.batch(), group=_sprite_group )
+        self._gameover = pg.sprite.Sprite( img=img, batch=sprites.batch(), group=_group_gui )
         self._gameover.visible = False
         self._gameover.update( x = window_width//2, 
                                y = window_height//2,
                                scale = min( 1.0, ratio_x, ratio_y) )
+
+        # intercalaire semi-transparent pour gameover
+        self._masque = pg.shapes.Rectangle(
+            x=0,y=0,width=window_width, height=window_height,
+            color=(40,20,10,150), batch=sprites.batch(), group=_group_masque)
+        self._masque.visible = False
+
 
     def update(self, label, text):
         self._labels[label].text = text
@@ -57,8 +65,10 @@ class Labels(object):
         for l in self._labels.values():
             l.text=""
         self._gameover.visible=False
+        self._masque.visible=False
 
     def show_gameover(self):
         self._labels[TOP_CENTER].text = "GAME OVER"
         self._gameover.visible=True
+        self._masque.visible=True
 
