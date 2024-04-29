@@ -134,7 +134,7 @@ class SuikaWindow(pg.window.Window):
         self._labels = gui.Labels( window_width=width, window_height=height )
         self._collision_helper = fruit.CollisionHelper(self._space)
         self.reset_game()
-        pg.clock.schedule_interval( self.update, interval=PYMUNK_INTERVAL )
+        pg.clock.schedule_interval( self.update_pymunk, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
         self.fps_display = pg.window.FPSDisplay(self)
         self.pymunk_speedmeter = utils.Speedmeter()
@@ -195,8 +195,9 @@ class SuikaWindow(pg.window.Window):
             print(f"shooted {f} at x={x} y={y}")
 
 
-    def update(self, dt):
+    def update_pymunk(self, dt):
         """Avance d'un pas la simulation physique
+        appelé directement avec un tiumer dedié indépendant de window.on_draw()
         """
         self.pymunk_speedmeter.tick_rel(dt)
         if( self._is_paused ):
@@ -211,12 +212,7 @@ class SuikaWindow(pg.window.Window):
         self._fruits.cleanup()
 
 
-    def on_draw(self):
-        if( fruit.g_fruit_cnt.cnt - len(self._fruits) > 5 ):
-            print( f"Ressource leak {print_status()}" )
-
-        # met a jour les positions des fruits 
-        self._fruits.update()
+    def update_gui(self):
 
         # gere le countdown en cas de débordement
         ids = self._walls.fruits_sur_maxline()
@@ -239,6 +235,16 @@ class SuikaWindow(pg.window.Window):
         self._labels.update( gui.TOP_RIGHT, f"FPS {self.pymunk_speedmeter.value:.0f}" )
         self._labels.update( gui.TOP_CENTER, game_status )
 
+
+
+    def on_draw(self):
+        if( fruit.g_fruit_cnt.cnt - len(self._fruits) > 5 ):
+            print( f"Ressource leak {print_status()}" )
+
+        # met a jour les positions des fruits et les widgets du GUI
+        self._fruits.update()
+        self.update_gui()
+
         # met à jour l'affichage
         self.clear()
         sprites.batch().draw()
@@ -252,7 +258,7 @@ class SuikaWindow(pg.window.Window):
 
         if(symbol == pg.window.key.ESCAPE):        # ESC ferme le jeu dans tous les cas
             self.close()
-        elif(self._is_gameover):    # n'importe quelle touche relance une partie apres un gameover
+        elif(self._is_gameover or symbol==pg.window.key.R):    # n'importe quelle touche relance une partie apres un gameover
             self.reset_game()
         elif(symbol == pg.window.key.A):           # A controle l'autoplay
             self.toggle_autoplay()

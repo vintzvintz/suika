@@ -11,7 +11,6 @@ class MaxLine( object ):
         space.add(self._body, self._shape)
         self._line = sprites.MaxLineSprite( height, width )
 
-
     def __del__(self):
         self._space.remove( self._body, self._shape )
 
