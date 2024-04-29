@@ -3,6 +3,7 @@ import collections
 import pyglet as pg
 from constants import *
 
+
 def now():
     return pg.clock.get_default().time()
 
@@ -58,18 +59,19 @@ class RessourceCounter(object):
         self._cnt = 0
         self.nom = nom
 
-    def __del__(self):
-        print( f"{self} __del__()" )
-
-    def __repr__(self):
-        return( f"Compteur '{self.nom}' = {self._cnt}")
-
-    def inc(self):
-        self._cnt += 1
-
-    def dec(self):
-        self._cnt -=1
-
     @property
-    def cnt(self): 
-        return self._cnt
+    def cnt(self):  return self._cnt
+
+    def __del__(self): print( f"{self} __del__()" )
+    def __repr__(self): return( f"Compteur '{self.nom}' = {self._cnt}")
+    def inc(self):  self._cnt += 1
+    def dec(self):  self._cnt -=1
+
+
+
+g_fruit_sprite_cnt = RessourceCounter("FruitSprites")
+g_preview_sprite_cnt = RessourceCounter("PreviewSprites")
+g_fruit_cnt = RessourceCounter("Fruit")
+
+def print_counters():
+    print(f"Fruit={g_fruit_cnt.cnt} FruitsSprite={g_fruit_sprite_cnt.cnt} PreviewSprite={g_preview_sprite_cnt.cnt}")

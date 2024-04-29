@@ -10,7 +10,6 @@ from sprites import VISI_NORMAL, VISI_HIDDEN
 from sprites import FruitSprite, ExplosionSprite
 
 
-
 _FRUITS_DEF = [
     # le rang dans cette liste sert de kind/points/collision_type;
     # valeur 0 réservée aux types sans handlers.
@@ -85,7 +84,7 @@ def _get_new_id():
     _g_fruit_id +=1
     return _g_fruit_id
 
-g_fruit_cnt = utils.RessourceCounter("Fruit")
+
 
 
 # POUR DEBUG transitions old-> new valides
@@ -131,7 +130,7 @@ class AnimatedCircle( pm.Circle ):
 
 class Fruit( object ):
     def __init__(self, space, on_remove=None, kind=0, position=None, mode=MODE_WAIT):
-        g_fruit_cnt.inc()
+        utils.g_fruit_cnt.inc()
         # espece aléatoire si non spécifiée
         assert kind<=nb_fruits(), "type de fruit inconnu"
         if( kind<=0 ):
@@ -198,7 +197,7 @@ class Fruit( object ):
 
 
     def __del__(self):
-        g_fruit_cnt.dec()
+        utils.g_fruit_cnt.dec()
         #print( f"__del__({self})")
         assert(    self._body is None 
                and self._shape is None 
@@ -305,6 +304,7 @@ class Fruit( object ):
         self._set_mode( MODE_NORMAL )
         self._shape.collision_type = self._kind
 
+
     def fade_in(self):
         """ fait apparaitre le sprite avec un effet d'agrandissement et de transparence
         """
@@ -359,175 +359,105 @@ class Fruit( object ):
         self.release_ressources()
 
 
-def _is_fruit_shape(shape):
-    return shape.collision_type > 0 and shape.collision_type<=nb_fruits()
+class ActiveFruits(object):
 
-def get_fruit(arbiter):
-    # détecte le fruit et la maxline dans la collision
-    if( _is_fruit_shape( arbiter.shapes[0]) ):
-        return arbiter.shapes[0].fruit
-    elif ( _is_fruit_shape( arbiter.shapes[1])):
-        return arbiter.shapes[1].fruit
-    else:
-        raise RuntimeError( "Collision sans fruit")
-
-def get_fruit_first_drop(arbiter):
-    """ Detecte le fruit MODE_FIRST_DROP dans une collision
-    """
-    s0 =arbiter.shapes[0]  # alias
-    s1 =arbiter.shapes[1]
-
-    first_fruit = None   # results
-    other_fruit = None
-    if( s0.collision_type==COLLISION_TYPE_FIRST_DROP ):
-        first_fruit = s0.fruit
-        if( _is_fruit_shape(s1) ):
-            other_fruit = s1.fruit
-    if( s1.collision_type==COLLISION_TYPE_FIRST_DROP ):
-        first_fruit = s1.fruit
-        if( _is_fruit_shape(s0) ):
-            other_fruit = s0.fruit
-    if( not first_fruit ):
-        raise AssertionError("collision handler appelé sur autre chose qu'un fruit en mode FIRST_DROP")
-    return (first_fruit, other_fruit)
-
-
-class CollisionHelper(object):
-    """ Contient le callback appelé par pymunk pour chaque collision 
-    et les algorithmes de choix des fruits à fusionner et créer
-    """
     def __init__(self, space):
-        self.reset()
-        self.setup_handlers( space )
+        self._space = space
+        self._fruits = dict()
+        self._score = 0
+        self._next_fruit = None
+        self._is_gameover = False
+
+    def __len__(self):
+        return len(self._fruits)
 
 
-    def reset( self ):
-         self._collisions_fruits = []
-         self._actions = []
+    def reset(self):
+        self._is_gameover = False
+        self.remove_all()
+        self.remove_next()
+        self._score = 0
 
-    def collision_fruit( self, arbiter ):
-        """ Callback pour pymunk collision_handler
+    def update(self):
+        if( self._next_fruit ):
+            self._next_fruit.update()
+        for f in self._fruits.values():
+            f.update()
+
+    def prepare_next(self, kind):
+        """Cree un fruit en attente de largage
         """
-        s0 = arbiter.shapes[0]
-        s1 = arbiter.shapes[1]
+        assert( not self._is_gameover )
+        if( self._next_fruit ):
+            print("next_fruit deja present")
+            return
+        self._next_fruit = Fruit(space=self._space, kind=kind, on_remove=self.on_remove)
+        # self.add() appelé dans play_next()
 
-        shapes = arbiter.shapes
-        assert( len(shapes)==2 ), " WTF ???"
-        assert( s0.fruit.kind == s1.fruit.kind )
-        self._collisions_fruits.append( (s0.fruit, s1.fruit) )
-        return True
+    def play_next(self, x):
+        if( (not self._next_fruit) or self._is_gameover ):
+            return
+        self._next_fruit.drop(x=x)
+        self.add( self._next_fruit )
+        self._next_fruit = None
 
+    def remove(self, id):
+        points = 0
+        if id in self._fruits:
+            points = self._fruits[id].points
+            self._fruits[id].remove()
+        return points
+    
+    def remove_all(self):
+        points = 0
+        for id in self._fruits:
+            points += self.remove(id)
+        self.cleanup()
+        return points
 
-    def collision_first_drop( self, arbiter ):
-        """ Appelé quand un fruit tombe sur un autre pour la 1ere fois après avoir été mis en jeu
+    def remove_next(self):
+        if( self._next_fruit ):
+            self._next_fruit.remove()
+            self._next_fruit = None
+
+    def autoplay_once(self, nb):
+        assert( not self._is_gameover )
+        for _ in range(nb):
+            f = Fruit( self._space, on_remove=self.on_remove )
+            self.add(f)
+            f.drop(x=random.randint(0, WINDOW_WIDTH))
+
+    def spawn(self, kind, position):
+        f =  Fruit( space = self._space,
+                     kind=kind,
+                     position=position,
+                     on_remove=self.on_remove)
+        self.add(f)
+        f.fade_in()
+        return f
+
+    def on_remove(self, f):
+        self._score += f.points
+
+    def gameover(self):
+        self._is_gameover = True
+        self.remove_next()
+
+    def add(self, newfruit):
+        self._fruits[ newfruit.id ] = newfruit
+
+    def cleanup(self, all_fruits=False):
+        """ garbage collection 
         """
-        (first_fruit, other_fruit) = get_fruit_first_drop(arbiter)
-        self._actions.append( lambda : first_fruit.normal() )
-        # la premiere collision est aussi une collision normale
-        if( other_fruit and first_fruit.kind==other_fruit.kind ):
-            self.collision_fruit(arbiter)
-        return True
+        # retire les fruits sortis du jeu
+        for f in self._fruits.values():
+            if not f.removed and f.is_offscreen():
+                print( f"WARNING {f} est sorti du jeu" )
+                f.remove()
 
-    def collision_maxline_begin(self, arbiter):
-        f = get_fruit(arbiter)
-        # execution différée, l'action peut changer en cas de collision  avec un autre fruit
-        self._actions.append( lambda : f.blink( activate=True, delay= BLINK_DELAY ) )
-        return False  # ignore les collisions avec maxline pour la simu physique
+        # libere les ressources associées aux fruits retirés du jeu
+        removed = [f.id for f in self._fruits.values() if (all_fruits or f.removed) ]
+        for id in removed:
+            self._fruits[id].release_ressources()
+            del self._fruits[id]        # should trigger fruit.__del__()
 
-    def collision_maxline_separate(self, arbiter):
-        f = get_fruit(arbiter)
-        # execution différée, l'action peut changer en cas de collision ou autre
-        self._actions.append( lambda : f.blink( activate=False ) )
-        return False  # ignore les collisions avec maxline pour la simu physique
-
-    def _collision_sets(self):
-        """ recherche les composantes connexes dans le graphe des collisions
-        Le graphe est défini par une liste d'adjacence
-        """
-        if( not self._collisions_fruits ):  # optimisation
-            return []
-
-        # ensemble des boules concernées par les collisions à résoudre
-        fruits = set( [pair[0] for pair in self._collisions_fruits] 
-                     +[pair[1] for pair in self._collisions_fruits] )
-
-        # construit le graphe des boules en contact
-        g = { f:set() for f in fruits }
-        for (a, b) in self._collisions_fruits :
-            g[a].add(b)
-            g[b].add(a)
-
-        # recherche les composantes connexes dans le graphe 
-        # https://francoisbrucker.github.io/cours_informatique/cours/graphes/chemins-cycles-connexite/
-        composantes = []
-        already_found = set()
-        for origine in fruits:
-            if origine in already_found:
-                continue
-            already_found.add(origine)
-            composante = {origine}
-            suivant = [origine]
-            while suivant:
-                x = suivant.pop()
-                already_found.add(x)
-                for y in g[x]:
-                    if y not in composante:
-                        composante.add(y)
-                        suivant.append(y)
-            composantes.append(composante)
-        return composantes
-
-
-    def _process_collisions(self, spawn_func):
-        """ modifie les fruits selon collisions apparues pendant pymunk.step()
-        """
-        # traite les explosions 
-        for collision_set in self._collision_sets():
-            # liste de Fruit à partir des ids, trié par altitude
-            explose_fruits = sorted( collision_set,  key=lambda f: f.position.y )
-            assert len( explose_fruits ) >= 2, "collision à un seul fruit ???"
-
-            # traite uniquement les 2 fruits les plus bas en cas de collision multiple
-            f0 = explose_fruits[0]
-            f1 = explose_fruits[1]
-            assert( f0.kind == f1.kind )
-            print( f"Fusion {[f0, f1]}" )
-            self._actions.append( f0.explose )
-            self._actions.append( lambda : f1.merge_to( dest=f0.position ) )
-
-            # remplace les fruits explosés par un seul nouveau fruit de taille supérieure
-            # copie les infos car f0 peut être REMOVED quand spawn() sera appelée
-            kind = min( f0.kind + 1, nb_fruits() )
-            position = f0.position
-            spawn_fruit = lambda dt : spawn_func(kind=kind, position=position ) 
-            pg.clock.schedule_once( spawn_fruit, delay=SPAWN_DELAY )
-
-
-    def process(self, spawn_func):
-        self._process_collisions(spawn_func)
-
-        # exectude les actions sur les fruits existants ( explose(), blink(), etc... )
-        for action in self._actions:
-            action()
-        self.reset()
-
-
-    def setup_handlers(self, space):
-
-        # collisions entre fruits en mode normal
-        for kind in range(1, nb_fruits()+1):
-            h = space.add_collision_handler(kind, kind)
-            h.begin = lambda arbiter, space, data : self.collision_fruit(arbiter)
-
-        # ignore les collisions entre un fruit FIRST_DROP et les murs latéraux
-        h = space.add_collision_handler( COLLISION_TYPE_FIRST_DROP, COLLISION_TYPE_WALL_SIDE )
-        h.begin = lambda arbiter, space, data: True
-
-        # collisions des fruits FIRST_DROP avec les fruits normaux ou le sol
-        h = space.add_wildcard_collision_handler( COLLISION_TYPE_FIRST_DROP )
-        h.begin = lambda arbiter, space, data: self.collision_first_drop(arbiter)
-
-        # collisions avec maxline
-        h = space.add_wildcard_collision_handler( COLLISION_TYPE_MAXLINE )
-        h.begin = lambda arbiter, space, data : self.collision_maxline_begin(arbiter)
-        h.separate = lambda arbiter, space, data : self.collision_maxline_separate(arbiter)

@@ -4,119 +4,14 @@ import pyglet as pg
 import pymunk as pm
 
 from constants import *
-import fruit, sprites, walls, gui
-from fruit import Fruit
+from walls import Walls
+from fruit import ActiveFruits
+import gui
+from collision import CollisionHelper
 import utils
-import preview
+from preview import FruitQueue
 import sprites
 
-
-def print_status():
-    print(f"Fruit={fruit.g_fruit_cnt.cnt} FruitsSprite={sprites.g_fruit_sprite_cnt.cnt} PreviewSprite={sprites.g_preview_sprite_cnt.cnt}")
-
-AUTOPLAY_FLOW = 1 + WINDOW_WIDTH // 750
-
-class ActiveFruits(object):
-
-    def __init__(self, space):
-        self._space = space
-        self._fruits = dict()
-        self._score = 0
-        self._next_fruit = None
-        self._is_gameover = False
-
-    def __len__(self):
-        return len(self._fruits)
-
-
-    def reset(self):
-        self._is_gameover = False
-        self.remove_all()
-        self.remove_next()
-        self._score = 0
-
-    def update(self):
-        if( self._next_fruit ):
-            self._next_fruit.update()
-        for f in self._fruits.values():
-            f.update()
-
-    def prepare_next(self, kind):
-        """Cree un fruit en attente de largage
-        """
-        assert( not self._is_gameover )
-        if( self._next_fruit ):
-            print("next_fruit deja present")
-            return
-        self._next_fruit = Fruit(space=self._space, kind=kind, on_remove=self.on_remove)
-        # self.add() appelé dans play_next()
-
-    def play_next(self, x):
-        if( (not self._next_fruit) or self._is_gameover ):
-            return
-        self._next_fruit.drop(x=x)
-        self.add( self._next_fruit )
-        self._next_fruit = None
-
-    def remove(self, id):
-        points = 0
-        if id in self._fruits:
-            points = self._fruits[id].points
-            self._fruits[id].remove()
-        return points
-    
-    def remove_all(self):
-        points = 0
-        for id in self._fruits:
-            points += self.remove(id)
-        self.cleanup()
-        return points
-
-    def remove_next(self):
-        if( self._next_fruit ):
-            self._next_fruit.remove()
-            self._next_fruit = None
-
-    def autoplay_once(self, nb):
-        assert( not self._is_gameover )
-        for _ in range(nb):
-            f = Fruit( self._space, on_remove=self.on_remove )
-            self.add(f)
-            f.drop(x=random.randint(0, WINDOW_WIDTH))
-
-    def spawn(self, kind, position):
-        f =  Fruit( space = self._space,
-                     kind=kind,
-                     position=position,
-                     on_remove=self.on_remove)
-        self.add(f)
-        f.fade_in()
-        return f
-
-    def on_remove(self, f):
-        self._score += f.points
-
-    def gameover(self):
-        self._is_gameover = True
-        self.remove_next()
-
-    def add(self, newfruit):
-        self._fruits[ newfruit.id ] = newfruit
-
-    def cleanup(self, all_fruits=False):
-        """ garbage collection 
-        """
-        # retire les fruits sortis du jeu
-        for f in self._fruits.values():
-            if not f.removed and f.is_offscreen():
-                print( f"WARNING {f} est sorti du jeu" )
-                f.remove()
-
-        # libere les ressources associées aux fruits retirés du jeu
-        removed = [f.id for f in self._fruits.values() if (all_fruits or f.removed) ]
-        for id in removed:
-            self._fruits[id].release_ressources()
-            del self._fruits[id]        # should trigger fruit.__del__()
 
 
 class SuikaWindow(pg.window.Window):
@@ -124,13 +19,13 @@ class SuikaWindow(pg.window.Window):
         super().__init__(width, height)
         self._space = pm.Space( )
         self._space.gravity = (0, -100*GRAVITY)
-        self._walls = walls.Walls(space=self._space, width=width, height=height)
-        self._preview = preview.FruitQueue(cnt=PREVIEW_COUNT)
+        self._walls = Walls(space=self._space, width=width, height=height)
+        self._preview = FruitQueue(cnt=PREVIEW_COUNT)
         self._fruits = ActiveFruits( space=self._space )
 
         self._countdown = utils.CountDown()
         self._labels = gui.Labels( window_width=width, window_height=height )
-        self._collision_helper = fruit.CollisionHelper(self._space)
+        self._collision_helper = CollisionHelper(self._space)
         self.reset_game()
         pg.clock.schedule_interval( self.update_pymunk, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
@@ -195,7 +90,7 @@ class SuikaWindow(pg.window.Window):
 
     def update_pymunk(self, dt):
         """Avance d'un pas la simulation physique
-        appelé directement avec un tiumer dedié indépendant de window.on_draw()
+        appelé par un timer dedié indépendant et plus rapide que window.on_draw()
         """
         self.pymunk_speedmeter.tick_rel(dt)
         if( self._is_paused ):
@@ -211,7 +106,6 @@ class SuikaWindow(pg.window.Window):
 
 
     def update_gui(self):
-
         # gere le countdown en cas de débordement
         ids = self._walls.fruits_sur_maxline()
         self._countdown.update( ids )
@@ -234,10 +128,9 @@ class SuikaWindow(pg.window.Window):
         self._labels.update( gui.TOP_CENTER, game_status )
 
 
-
     def on_draw(self):
-        if( fruit.g_fruit_cnt.cnt - len(self._fruits) > 5 ):
-            print( f"Ressource leak {print_status()}" )
+        if( utils.g_fruit_cnt.cnt - len(self._fruits) > 5 ):
+            print( f"Ressource leak {utils.print_counters()}" )
 
         # met a jour les positions des fruits et les widgets du GUI
         self._fruits.update()
@@ -252,7 +145,7 @@ class SuikaWindow(pg.window.Window):
     def on_key_press(self, symbol, modifiers):
         #print(f"key {symbol} was pressed")
         if(symbol == pg.window.key.S):        # DEBUG
-            print_status()
+            utils.print_counters()
 
         if(symbol == pg.window.key.ESCAPE):        # ESC ferme le jeu dans tous les cas
             self.close()
