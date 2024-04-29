@@ -133,6 +133,7 @@ class SuikaWindow(pg.window.Window):
 
         # met a jour les positions des fruits et les widgets du GUI
         self._fruits.update()
+        self._preview.update()
         self.update_gui()
 
         # met à jour l'affichage
