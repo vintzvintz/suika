@@ -129,8 +129,10 @@ class AnimatedCircle( pm.Circle ):
 
 
 class Fruit( object ):
-    def __init__(self, space, on_remove=None, kind=0, position=None, mode=MODE_WAIT):
-        utils.g_fruit_cnt.inc()
+    def __init__(self, space, on_remove=None, kind=0, position=None, mode=MODE_WAIT, refcnt=None):
+        self._refcnt_f = utils.g_fruit_cnt
+        self._refcnt_f.inc()
+
         # espece aléatoire si non spécifiée
         assert kind<=nb_fruits(), "type de fruit inconnu"
         if( kind<=0 ):
@@ -157,13 +159,22 @@ class Fruit( object ):
         self._sprites = { 
             SPRITE_MAIN : FruitSprite( 
                 nom=fruit_def['name'], 
-                r=fruit_def['radius'])
+                r=fruit_def['radius'] )
         }
         self._fruit_mode = None
         self._dash_start_time = None
         self._set_mode( mode )
         #print( f"{self}.__init__()" )
         print( f"{self} created" )
+
+
+    def __del__(self):
+        self._refcnt_f.dec()
+        #print( f"__del__({self})")
+        assert(    self._body is None 
+               and self._shape is None 
+               and len(self._sprites)==0
+               and self._fruit_mode == MODE_REMOVED), "ressources non libérées"
 
 
     def __repr__(self):
@@ -196,13 +207,6 @@ class Fruit( object ):
         self._sprites = {}   # should call sprite.delete() ...
 
 
-    def __del__(self):
-        utils.g_fruit_cnt.dec()
-        #print( f"__del__({self})")
-        assert(    self._body is None 
-               and self._shape is None 
-               and len(self._sprites)==0
-               and self._fruit_mode == MODE_REMOVED), "ressources non libérées"
 
     @property
     def id(self):

@@ -36,9 +36,6 @@ class MaxLineSprite( pg.shapes.Line ):
             color=(255,20,20), 
             batch=batch(), 
             group=sprite_group(SPRITE_GROUP_GUI) )
-        
-    def __del__(self):
-        pg.shapes.Line.delete()
 
 
 class SuikaSprite ( pg.sprite.Sprite ):
@@ -157,7 +154,8 @@ class FruitSprite( SuikaSprite ):
     def __init__(self, nom, r, group=None):
         """  sprite pyglet associé à l'objet physique
         """
-        g_fruit_sprite_cnt.inc()
+        self._refcnt_f = utils.g_fruit_sprite_cnt
+        self._refcnt_f.inc()
         if( group is None ):
             group = sprite_group(SPRITE_GROUP_FRUITS)
         img = pg.resource.image( f"{nom}.png" )
@@ -165,23 +163,26 @@ class FruitSprite( SuikaSprite ):
         img.anchor_y = img.height // 2
         self._scale_ref = (2 * r / img.width,  2 * r / img.height)
 
-        super().__init__(img=img, batch=batch(), group=group )
+        super().__init__(img=img, 
+                         batch=batch(), 
+                         group=sprite_group(SPRITE_GROUP_FRUITS) )
 
     def __del__(self):
-        g_fruit_sprite_cnt.dec()
+        self._refcnt_f.dec()
         super().__del__()
 
 
 class PreviewSprite( FruitSprite ):
-    def __init__(self, nom, width=PREVIEW_SPRITE_SIZE ):
-        g_preview_sprite_cnt.inc()
-        super().__init__(nom, r=width/2, group=sprite_group(SPRITE_GROUP_GUI))
+    def __init__(self, nom, width=PREVIEW_SPRITE_SIZE, refcnt=None ):
+        self._refcnt_pv = utils.g_preview_sprite_cnt
+        self._refcnt_pv.inc()
+        super().__init__(nom, r=width/2, group=sprite_group(SPRITE_GROUP_GUI) )
 
     def update(self, x, y):
          super().update( x=x, y=y, rotation=0, on_animation_stop=None )
 
     def __del__(self):
-        g_preview_sprite_cnt.dec()
+        self._refcnt_pv.dec()
         super().__del__()
 
 
