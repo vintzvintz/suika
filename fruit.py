@@ -338,7 +338,7 @@ class Fruit( object ):
     
 
     def explose(self):
-        if( self._fruit_mode==MODE_MERGE):
+        if( self._fruit_mode in [MODE_MERGE, MODE_REMOVED] ):
             return
         self._set_mode(MODE_MERGE)
         explo = ExplosionSprite( 
@@ -381,6 +381,7 @@ class ActiveFruits(object):
         self.remove_all()
         self.remove_next()
         self._score = 0
+        pg.clock.unschedule( self.explose_seq )
 
     def update(self):
         if( self._next_fruit ):
@@ -443,9 +444,25 @@ class ActiveFruits(object):
     def on_remove(self, f):
         self._score += f.points
 
+    def explose_seq(self, dt):
+        """fait exploser les fruits en commençant par le plus récent
+        """
+        # cherche le fruit non explosé le plus ancien
+        explosables = [ i for i,f in self._fruits.items() if f._fruit_mode in [MODE_NORMAL, MODE_FIRST_DROP] ]
+        #print( f'reste {len(self._fruits)} fruits actifs dont {len(explosables)} explosables')
+        if( explosables ):
+            explosables.sort(reverse=True )
+            self._fruits[explosables[0]].explose()
+        # continue tant qu'il reste des fruits
+        if( self._fruits ):
+            pg.clock.schedule_once( self.explose_seq, GAMEOVER_ANIMATION_INTERVAL )
+
     def gameover(self):
         self._is_gameover = True
         self.remove_next()
+        # programme l'explosion des fruits restants
+        print( f'programme explosion finale pour {len(self._fruits)} fruits actifs')
+        pg.clock.schedule_once( self.explose_seq, GAMEOVER_ANIMATION_START)
 
     def add(self, newfruit):
         self._fruits[ newfruit.id ] = newfruit

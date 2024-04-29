@@ -1,5 +1,5 @@
 
-WINDOW_HEIGHT = 800
+WINDOW_HEIGHT = 600
 WINDOW_MAXLINE_MARGIN = 200
 WINDOW_WIDTH  = 1000
 
@@ -14,9 +14,9 @@ PREVIEW_SHIFT_DELAY = 0.2  # seconds
 
 
 PYMUNK_INTERVAL = 1 / 120.0     # physics engine steps per sec.
-FRICTION = 0.50
+FRICTION = 0.80
 GRAVITY = 9.81
-INITIAL_VELOCITY = 1000
+INITIAL_VELOCITY = 900
 
 
 NEXT_FRUIT_INTERVAL = 0.2
@@ -25,6 +25,9 @@ AUTOPLAY_FLOW = 1 + WINDOW_WIDTH // 750
 
 COUNTDOWN_DISPLAY_LIMIT = 3.0   # secondes
 GAMEOVER_DELAY = 4.0         # secondes
+
+GAMEOVER_ANIMATION_START = 5         # secondes
+GAMEOVER_ANIMATION_INTERVAL = 0.3    # secondes
 
 # parametres animations 
 BLINK_DELAY = 1.0          #secondes
