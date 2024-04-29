@@ -1,4 +1,5 @@
 
+import time
 import collections
 import pyglet as pg
 from constants import *
@@ -14,6 +15,7 @@ class Speedmeter(object):
         self._history = collections.deque( [0] * SPEEDMETER_BUFSIZE, maxlen=SPEEDMETER_BUFSIZE )
         self.value = 0.0
         self._ticks = 0
+        self._last_tick = None
 
     def tick_rel(self, dt):
         self._ticks += 1
@@ -21,6 +23,13 @@ class Speedmeter(object):
         # self._history.pop()    # inutile avec maxlen
         if( (self._ticks % 20)==0 ):
             self.value = len(self._history) / sum(self._history)
+
+    def tick(self):
+        current = time.perf_counter()
+        if( self._last_tick ):
+            last = self._last_tick
+            self.tick_rel( current-last )
+        self._last_tick = current
 
 
 class CountDown(object):
@@ -62,8 +71,8 @@ class RessourceCounter(object):
     @property
     def cnt(self):  return self._cnt
 
-    def __del__(self): print( f"{self} __del__()" )
-    def __repr__(self): return( f"Compteur '{self.nom}' = {self._cnt}")
+    def __del__(self): print( f"{self}" )
+    def __repr__(self): return( f"{self.nom}={self._cnt}")
     def inc(self):  self._cnt += 1
     def dec(self):  self._cnt -=1
 

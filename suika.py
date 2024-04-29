@@ -29,8 +29,8 @@ class SuikaWindow(pg.window.Window):
         self.reset_game()
         pg.clock.schedule_interval( self.update_pymunk, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
-        self.fps_display = pg.window.FPSDisplay(self)
-        self.pymunk_speedmeter = utils.Speedmeter()
+        self.display_fps = utils.Speedmeter()
+        self.pymunk_fps = utils.Speedmeter()
 
 
     def reset_game(self):
@@ -43,7 +43,6 @@ class SuikaWindow(pg.window.Window):
         self._labels.reset()
         self._countdown.update( deborde=False )
         self.prepare_next( )
-        self.fps_display = pg.window.FPSDisplay(self)
 
 
     def prepare_next(self):
@@ -92,7 +91,7 @@ class SuikaWindow(pg.window.Window):
         """Avance d'un pas la simulation physique
         appelé par un timer dedié indépendant et plus rapide que window.on_draw()
         """
-        self.pymunk_speedmeter.tick_rel(dt)
+        self.pymunk_fps.tick_rel(dt)
         if( self._is_paused ):
             return
         # prepare le gestionnaire de collisions
@@ -124,7 +123,7 @@ class SuikaWindow(pg.window.Window):
 
         #self._labels.update( gui.TOP_LEFT, f"fruits {len(self._fruits)}" )
         self._labels.update( gui.TOP_LEFT, f"score {self._fruits._score}" )
-        self._labels.update( gui.TOP_RIGHT, f"FPS {self.pymunk_speedmeter.value:.0f}" )
+        self._labels.update( gui.TOP_RIGHT, f"FPS {self.pymunk_fps.value:.0f} / {self.display_fps.value:.0f}" )
         self._labels.update( gui.TOP_CENTER, game_status )
 
 
@@ -139,7 +138,7 @@ class SuikaWindow(pg.window.Window):
         # met à jour l'affichage
         self.clear()
         sprites.batch().draw()
-        self.fps_display.draw()
+        self.display_fps.tick()
 
 
     def on_key_press(self, symbol, modifiers):
