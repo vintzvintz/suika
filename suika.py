@@ -83,8 +83,9 @@ class SuikaWindow(pg.window.Window):
         qi = self._space.point_query( (x, y), max_distance=0, shape_filter=pm.ShapeFilter() )
         if( len(qi)>0 ):
             f = qi[0].shape.fruit
-            self._fruits.remove(f.id)
-            print(f"shooted {f} at x={x} y={y}")
+            print(f"{f} right click x={x} y={y}")
+            if( not self._is_gameover ):
+                self._fruits.remove(f.id)
 
 
     def update_pymunk(self, dt):
@@ -155,12 +156,20 @@ class SuikaWindow(pg.window.Window):
             self.toggle_autoplay()
         elif(symbol == pg.window.key.SPACE):        # SPACE met le jeu en pause
             self.toggle_pause()
+        elif(symbol == pg.window.key.G):        # force un gameover en cours de partie
+            self.gameover()
         else:
             return pg.event.EVENT_UNHANDLED
         return pg.event.EVENT_HANDLED
 
 
     def on_mouse_press(self, x, y, button, modifiers):
+
+        # Supprime un fruit sur clic droit
+        if( (button & pg.window.mouse.RIGHT) ):
+            self.shoot_fruit(x, y)
+            return
+
         # relance une partie si la précédente est terminée
         if( self._is_gameover ):
             self.reset_game()
@@ -172,9 +181,6 @@ class SuikaWindow(pg.window.Window):
             if( not self._is_autoplay ):
                 pg.clock.schedule_once( lambda dt: self.prepare_next(), delay=NEXT_FRUIT_INTERVAL)
 
-        # Supprime un fruit sur clic droit
-        if( (button & pg.window.mouse.RIGHT) and not self._is_gameover ):
-            self.shoot_fruit(x, y)
 
 def main():
     pg.resource.path = ['assets/']
