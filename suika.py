@@ -85,7 +85,7 @@ class SuikaWindow(pg.window.Window):
             f = qi[0].shape.fruit
             print(f"{f} right click x={x} y={y}")
             if( not self._is_gameover ):
-                self._fruits.remove(f.id)
+                f.explose()
 
 
     def update_pymunk(self, dt):
@@ -180,6 +180,10 @@ class SuikaWindow(pg.window.Window):
             self._fruits.play_next(x=x)
             if( not self._is_autoplay ):
                 pg.clock.schedule_once( lambda dt: self.prepare_next(), delay=NEXT_FRUIT_INTERVAL)
+
+
+    def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
+        print(f"on_mouse_scroll(x={x} y={y} scroll_x={scroll_x} scroll_y={scroll_y}")
 
 
 def main():
