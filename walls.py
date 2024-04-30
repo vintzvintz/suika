@@ -48,6 +48,7 @@ class Walls(object):
         walls = [wall_bottom, wall_left, wall_right]
         for s in walls:
             s.friction = FRICTION
+            s.elasticity = ELASTICITY_WALLS
             s.filter = pm.ShapeFilter( 
                 categories=CAT_WALLS,
                 mask=pm.ShapeFilter.ALL_MASKS() )

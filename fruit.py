@@ -27,6 +27,8 @@ _FRUITS_DEF = [
     {'mass':50, 'radius':200, 'name':'pasteque' },
 ]
 
+_FRUITS_RANDOM = [ 1,2,3,4 ]
+
 def nb_fruits():
     return len(_FRUITS_DEF) - 1
 
@@ -85,8 +87,6 @@ def _get_new_id():
     return _g_fruit_id
 
 
-
-
 # POUR DEBUG transitions old-> new valides
 g_valid_transitions = {
     MODE_WAIT : ( MODE_FIRST_DROP, MODE_NORMAL, MODE_MERGE, MODE_REMOVED ),    # mode initial à la creation
@@ -98,7 +98,7 @@ g_valid_transitions = {
 
 
 def random_kind():
-    return random.randint( 1, 4 )
+    return random.choice( _FRUITS_RANDOM )
 
 def name_from_kind(kind):
     return _FRUITS_DEF[kind]["name"]
@@ -189,13 +189,13 @@ class Fruit( object ):
         shape = AnimatedCircle(body=body, radius=radius)
         shape.mass = mass
         shape.friction = FRICTION
+        shape.elasticity = ELASTICITY_FRUIT
         #  ajoute fruit_id comme attribut custom de l'objet pymunk 
         shape.fruit = self
         return body, shape
 
 
     def release_ressources(self):
-
         if( not self.removed ):
             print( f"WARNING: {self} delete() avec mode différent de MODE_REMOVED ({self._fruit_mode})" )
         # remove pymunk objects and local references
@@ -203,9 +203,8 @@ class Fruit( object ):
             #print( f"{self}.delete()")
             self._space.remove( self._body, self._shape )
             self._body = self._shape = None
-
-        self._sprites = {}   # should call sprite.delete() ...
-
+        # should call sprite.delete()
+        self._sprites = {}   
 
 
     @property
@@ -412,7 +411,7 @@ class ActiveFruits(object):
             points = self._fruits[id].points
             self._fruits[id].remove()
         return points
-    
+
     def remove_all(self):
         points = 0
         for id in self._fruits:
