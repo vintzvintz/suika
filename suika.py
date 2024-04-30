@@ -1,4 +1,3 @@
-import random
 
 import pyglet as pg
 import pymunk as pm
