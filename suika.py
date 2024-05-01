@@ -151,7 +151,7 @@ class SuikaWindow(pg.window.Window):
 
     def on_key_press(self, symbol, modifiers):
         #print(f"key {symbol} was pressed")
-        if(symbol == pg.window.key.S):        # DEBUG
+        if(symbol == pg.window.key.D):        # DEBUG
             utils.print_counters()
 
         if(symbol == pg.window.key.ESCAPE):        # ESC ferme le jeu dans tous les cas
@@ -160,7 +160,7 @@ class SuikaWindow(pg.window.Window):
             self.reset_game()
         elif(symbol == pg.window.key.A):           # A controle l'autoplay
             self.toggle_autoplay()
-        elif(symbol == pg.window.key.SPACE):        # SPACE secoue le bocal
+        elif(symbol == pg.window.key.S):        # S secoue le bocal automatiquement
             self._bocal.shake = True
         elif(symbol == pg.window.key.P):        # P met le jeu en pause
             self.toggle_pause()
@@ -172,7 +172,7 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_key_release(self, symbol, modifiers):
-        if(symbol == pg.window.key.SPACE):        # SPACE secoue le bocal
+        if(symbol == pg.window.key.S):        # S arrete de secouee le bocal automatiquement
             self._bocal.shake = False
 
 
@@ -193,8 +193,8 @@ class SuikaWindow(pg.window.Window):
             pos = self._bocal.drop_point_from_clic( x, force_inside=False )
             if(pos):
                 self._fruits.play_next(pos)
-            if( not self._is_autoplay ):
-                pg.clock.schedule_once( lambda dt: self.prepare_next(), delay=NEXT_FRUIT_INTERVAL)
+                if( not self._is_autoplay ):
+                    pg.clock.schedule_once( lambda dt: self.prepare_next(), delay=NEXT_FRUIT_INTERVAL)
 
 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):

@@ -5,6 +5,17 @@ from sprites import LineSprite
 import utils
 
 
+DROP_MARGIN = 0.02  # pourcentage de la largeur du bocal
+
+LEFT = "left"
+RIGHT = "right"
+BOTTOM = "bottom"
+MAXLINE = "maxline"
+
+SHAKE_OFF='off'
+SHAKE_ON='on'
+SHAKE_STOPPING='stopping'
+
 
 class BoxElement(object):
     """ forme physique pymunk associée à un objet graphique
@@ -53,16 +64,7 @@ class MaxLine( BoxElement ):
     def make_sprite(self, a, b):
         return LineSprite.redline( a, b )
 
-DROP_MARGIN = 0.02  # pourcentage de la largeur du bocal
 
-LEFT = "left"
-RIGHT = "right"
-BOTTOM = "bottom"
-MAXLINE = "maxline"
-
-SHAKE_OFF='off'
-SHAKE_ON='on'
-SHAKE_STOPPING='stopping'
 
 def _make_walls( body, width, height):
     left = Wall( body, a=(0, 0), b=(0, height), collision_type=COLLISION_TYPE_WALL_SIDE )
