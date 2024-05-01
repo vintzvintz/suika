@@ -12,7 +12,6 @@ from preview import FruitQueue
 import sprites
 
 
-
 class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
         super().__init__(width, height)
@@ -36,6 +35,8 @@ class SuikaWindow(pg.window.Window):
         self._is_gameover = False
         self._is_paused = False
         self._is_autoplay = False
+        self._is_mouse_shake = False
+        self._bocal.reset()
         self._preview.reset()
         self._fruits.reset()
         self._collision_helper.reset()
@@ -76,6 +77,10 @@ class SuikaWindow(pg.window.Window):
     def toggle_pause(self):
         assert( not self._is_gameover )
         self._is_paused = not self._is_paused
+
+
+    def set_mouse_shake( self, activate ):
+        self._is_mouse_shake = bool(activate)
 
 
     def shoot_fruit(self, x, y):
@@ -161,7 +166,10 @@ class SuikaWindow(pg.window.Window):
         elif(symbol == pg.window.key.A):           # A controle l'autoplay
             self.toggle_autoplay()
         elif(symbol == pg.window.key.S):        # S secoue le bocal automatiquement
-            self._bocal.shake = True
+            self._bocal.shake_auto()
+        elif(symbol == pg.window.key.SPACE):        # SPACE met en mode MOUSE_SHAKE
+            self._bocal.shake_mouse()
+            self.push_handlers( self._bocal.on_mouse_motion )
         elif(symbol == pg.window.key.P):        # P met le jeu en pause
             self.toggle_pause()
         elif(symbol == pg.window.key.G):        # G force un gameover en cours de partie
@@ -172,8 +180,11 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_key_release(self, symbol, modifiers):
-        if(symbol == pg.window.key.S):        # S arrete de secouee le bocal automatiquement
-            self._bocal.shake = False
+        if(symbol == pg.window.key.SPACE):       # arrete de secouee le bocal automatiquement
+            self._bocal.shake_stop()
+            self.pop_handlers()
+        if(symbol == pg.window.key.S):       # arrete de secouee le bocal automatiquement
+            self._bocal.shake_stop()
 
 
     def on_mouse_press(self, x, y, button, modifiers):
@@ -190,11 +201,16 @@ class SuikaWindow(pg.window.Window):
 
         # laĉhe le next_fruit
         if( (button & pg.window.mouse.LEFT) and not self._is_gameover ):
-            pos = self._bocal.drop_point_from_clic( x, force_inside=False )
-            if(pos):
-                self._fruits.play_next(pos)
-                if( not self._is_autoplay ):
-                    pg.clock.schedule_once( lambda dt: self.prepare_next(), delay=NEXT_FRUIT_INTERVAL)
+            next = self._fruits.peek_next()
+            if( not next ):
+                return
+            margin=next.radius + WALL_THICKNESS * 0.5 + 1
+            pos = self._bocal.drop_point_from_clic( x, margin=margin )
+            if( not pos ):
+                return
+            self._fruits.play_next(pos)
+            if( not self._is_autoplay ):
+                pg.clock.schedule_once( lambda dt: self.prepare_next(), delay=NEXT_FRUIT_INTERVAL)
 
 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):

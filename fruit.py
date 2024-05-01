@@ -403,6 +403,9 @@ class ActiveFruits(object):
         self.add( self._next_fruit )
         self._next_fruit = None
 
+    def peek_next(self):
+        return self._next_fruit
+
     def remove(self, id):
         points = 0
         if id in self._fruits:

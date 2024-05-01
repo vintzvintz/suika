@@ -165,9 +165,9 @@ class CollisionHelper(object):
             h = space.add_collision_handler(kind, kind)
             h.begin = lambda arbiter, space, data : self.collision_fruit(arbiter)
 
-        # ignore les collisions entre un fruit FIRST_DROP et les murs latéraux
-        h = space.add_collision_handler( COLLISION_TYPE_FIRST_DROP, COLLISION_TYPE_WALL_SIDE )
-        h.begin = lambda arbiter, space, data: True
+        # # ignore les collisions entre un fruit FIRST_DROP et les murs latéraux
+        # h = space.add_collision_handler( COLLISION_TYPE_FIRST_DROP, COLLISION_TYPE_WALL_SIDE )
+        # h.begin = lambda arbiter, space, data: True
 
         # collisions des fruits FIRST_DROP avec les fruits normaux ou le sol
         h = space.add_wildcard_collision_handler( COLLISION_TYPE_FIRST_DROP )

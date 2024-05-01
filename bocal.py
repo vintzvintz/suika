@@ -5,15 +5,14 @@ from sprites import LineSprite
 import utils
 
 
-DROP_MARGIN = 0.02  # pourcentage de la largeur du bocal
-
 LEFT = "left"
 RIGHT = "right"
 BOTTOM = "bottom"
 MAXLINE = "maxline"
 
 SHAKE_OFF='off'
-SHAKE_ON='on'
+SHAKE_AUTO='auto'
+SHAKE_MOUSE='mouse'
 SHAKE_STOPPING='stopping'
 
 
@@ -30,9 +29,13 @@ class BoxElement(object):
         s.collision_type = collision_type
         self.segment, self.line = s, l
 
+
     def update(self):
-        self.line.position = self.body.local_to_world( self.segment.a )
-        self.line.rotation = self.body.angle
+        pv1 = self.body.position + self.segment.a.rotated(self.body.angle)
+        pv2 = self.body.position + self.segment.b.rotated(self.body.angle)
+        self.line.x, self.line.y = round(pv1.x), round(pv1.y)
+        self.line.x2, self.line.y2 = round(pv2.x), round(pv2.y)
+
 
     def make_sprite(self):
         return NotImplementedError( "Instancier plutot Wall() ou MaxLine()" )
@@ -49,6 +52,7 @@ class Wall( BoxElement ):
 
     def make_sprite(self, a, b):
         return LineSprite.wall( a, b )
+
 
 
 class MaxLine( BoxElement ):
@@ -85,12 +89,12 @@ class DropZone(object):
 
 
     def _drop_point_interpolate(self, r):
-        assert( r >= DROP_MARGIN and r <= 1-DROP_MARGIN ), "tentative de lâcher un fruit hors du bocal"
+        #assert( r >= DROP_MARGIN and r <= 1-DROP_MARGIN ), "tentative de lâcher un fruit hors du bocal"
         point = self._left + (self._right - self._left) * r
         return  self._body.local_to_world( point )
 
 
-    def drop_point_from_clic(self, x_clic, force_inside ):
+    def drop_point_from_clic(self, x_clic, margin ):
         """ Renvoie 
         soit le point de lacher d'un fruit en fonction du point cliqué
         soit None si le point est hors du bocal
@@ -99,18 +103,19 @@ class DropZone(object):
         (x_right, y_right) = self._body.local_to_world( self._right )
 
         # position relative sur la dropline
-        if( abs(x_right - x_left) > 1 ):
+        if( abs(x_right - x_left) > 1.0 ):
             r = (x_clic - x_left)  / ( x_right - x_left )
         else:
             r = 0.5    # cas particulier du bocal horizontal, sinon division par 0
 
-        if( force_inside ):
-            r = max( DROP_MARGIN, r)
-            r = min( 1-DROP_MARGIN, r)
-
-        if( r < DROP_MARGIN or r > 1-DROP_MARGIN ):
+        if( r < 0 or r > 1 ):
             print("clic hors du bocal")
             return None
+
+        # ajuste le point de chute pour que le fruit ne deborde pas
+        if( margin ):
+            r = max( margin, r)
+            r = min( 1 - margin, r)
 
         return self._drop_point_interpolate( r )
 
@@ -132,6 +137,7 @@ class Bocal(object):
         b0 = pm.Body(body_type=pm.Body.KINEMATIC)
         self._position_ref = (x0, y0)
         b0.position = (x0, y0)
+        #b0.angle = math.pi/12
         space.add( b0 )
  
         self._walls = _make_walls(b0, width=width, height=height)
@@ -142,32 +148,41 @@ class Bocal(object):
         self._maxline = self._walls[MAXLINE]
         self._dropzone = DropZone(body=b0, height=height-100, length=width)
         self._shake = SHAKE_OFF
-        self._shake_start_time = None
+        self._shake_start_time = None     # t0 pour la secousse automatique
+        self._shake_mouse_target = None   # position du bocal a atteidre en mode SHAKE_MOUSE
+
+
+    def reset(self):
+        self._body.position =self._position_ref
+        self._shake = SHAKE_OFF
+        self._shake_start_time = None     # t0 pour la secousse automatique 
+        self._shake_mouse_target = None   # position du bocal a atteidre en mode SHAKE_MOUSE
+
 
     def __del__(self):
         self._space.remove( self._body )
         #les elements de self._walls se suppriment eux-mêmes
-
-    @property
-    def shake(self):
-        return self._shake != SHAKE_OFF
-
-    @shake.setter
-    def shake(self, val):
-        if( val ):
-            self._shake = SHAKE_ON
-            self._shake_start_time = utils.now()
-            print( f"shake started" )
-
-        else:
-            self._shake = SHAKE_STOPPING
-            self._shake_start_time = None
 
 
     @property
     def width(self):
         bot = self._walls[BOTTOM].segment
         return (bot.b - bot.a).length
+
+
+    def shake_auto(self):
+        self._shake = SHAKE_AUTO
+        self._shake_start_time = utils.now()
+
+    def shake_mouse(self):
+        self._shake = SHAKE_MOUSE
+        self._shake_mouse_target = self._position_ref
+
+    def shake_stop(self):
+        self._shake = SHAKE_STOPPING
+        self._shake_start_time = None
+        self._shake_mouse_target = None
+
 
     def fruits_sur_maxline(self):
         """ Id des fruits en contact avec maxline
@@ -183,18 +198,18 @@ class Bocal(object):
             return
 
         # oscillation sinusoidale accelerée
-        elif( self._shake == SHAKE_ON ):
+        elif( self._shake == SHAKE_AUTO ):
             (x_ref, y_ref) =  self._position_ref
             t = utils.now() - self._shake_start_time
             freq = min(
-                WALLS_SHAKE_FREQ_MAX, 
-                (WALLS_SHAKE_FREQ_MIN + t/WALLS_SHAKE_ACCEL_DELAY * (WALLS_SHAKE_FREQ_MAX-WALLS_SHAKE_FREQ_MIN)))
+                SHAKE_FREQ_MAX, 
+                (SHAKE_FREQ_MIN + t/SHAKE_ACCEL_DELAY * (SHAKE_FREQ_MAX-SHAKE_FREQ_MIN)))
             #print(f"shake freq={freq}Hz  t={t}s")
-            p  =  ( x_ref + 30 * math.sin( 2 * math.pi * freq * t), y_ref ) 
+            p  =  ( x_ref + SHAKE_AMPLITUDE_X * math.sin( 2 * math.pi * freq * t), y_ref ) 
             # vitesse pour atteindre la position au prochain step
             velocity = (p - self._body.position)/dt
 
-        # retour amorti  à la position de reference
+        # retour amorti à la position de reference
         elif( self._shake == SHAKE_STOPPING ):
             dist = self._position_ref - self._body.position 
             velocity =  dist / (dt *10) 
@@ -203,11 +218,16 @@ class Bocal(object):
             dist_from_position_ref = (self._body.position - self._position_ref)
             #print( f"shake stopping v={velocity.length}, dist={dist_from_position_ref.length}" )
             if ( dist_from_position_ref.length < 1 ):
-                print( f"shake stopped" )
                 velocity = (0,0)
                 self._body.position = self._position_ref
                 self._shake = SHAKE_OFF
 
+        # se dirige vers la position cible du mouseshake
+        elif( self._shake == SHAKE_MOUSE ):
+            dist = self._shake_mouse_target - self._body.position
+            velocity =  dist / (dt*3) 
+
+        
         self._body.velocity = velocity
 
 
@@ -218,8 +238,21 @@ class Bocal(object):
             w.update()
 
 
-    def drop_point_from_clic(self, x_clic, force_inside=False ):
-        return self._dropzone.drop_point_from_clic(x_clic, force_inside)
+    def on_mouse_motion(self, x, y, dx, dy):
+        if(self._shake==SHAKE_MOUSE):
+#            print(f"before shaking => target={self._shake_mouse_target} dx={dx} dy={dy}")
+            dv = pm.Vec2d(dx, dy)/3
+            (xt, yt) = self._shake_mouse_target + dv
+            (x_ref, y_ref) =  self._position_ref
+            xt = min( max(xt, x_ref - SHAKE_AMPLITUDE_X ), x_ref + SHAKE_AMPLITUDE_X)
+            yt = min( max(yt, y_ref - SHAKE_AMPLITUDE_Y ), y_ref + SHAKE_AMPLITUDE_Y)
+            self._shake_mouse_target = (xt, yt)
+#            print(f"after shaking  => target={self._shake_mouse_target}")
+
+
+    def drop_point_from_clic(self, x_clic, margin ):
+        return self._dropzone.drop_point_from_clic(x_clic, margin=margin/self.width)
+
 
     def drop_point_random(self, margin):
         return self._dropzone.drop_point_random(margin / self.width)
