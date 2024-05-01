@@ -8,6 +8,12 @@ pg.resource.path = ['assets/']
 VISI_NORMAL = 'visi_normal'
 VISI_HIDDEN = 'visi_hidden'
 
+SPRITE_GROUP_FOND = 'fond'
+SPRITE_GROUP_FRUITS = 'fruit'
+SPRITE_GROUP_EXPLOSIONS = 'explosions'
+SPRITE_GROUP_MASQUE = 'masque'
+SPRITE_GROUP_GUI = 'gui'
+
 _groups = {
     SPRITE_GROUP_FOND : pg.graphics.Group( order = 0 ),
     SPRITE_GROUP_FRUITS : pg.graphics.Group( order = 1 ),
@@ -16,26 +22,41 @@ _groups = {
     SPRITE_GROUP_GUI : pg.graphics.Group( order = 4 )
 }
 
-_g_batch = pg.graphics.Batch()   # optimisation pour l'affichage
-
-def sprite_group(name):
-    return _groups[name]
-
-def batch():
-    return _g_batch
-
+def sprite_group(name): return _groups[name]
+def batch():            return _g_batch
+def groupe_gui():       return _groups[SPRITE_GROUP_GUI]
+def groupe_masque():    return _groups[SPRITE_GROUP_MASQUE]
 
 g_fruit_sprite_cnt = utils.RessourceCounter("FruitSprites")
 g_preview_sprite_cnt = utils.RessourceCounter("PreviewSprites")
 
-# Ligne rouge de niveau maxi
-class MaxLineSprite( pg.shapes.Line ):
-    def __init__(self, height, width):
-        super().__init__( 
-            x=0, y=height, x2=width, y2=height, width=3, 
-            color=(255,20,20), 
+_g_batch = pg.graphics.Batch()   # optimisation pour l'affichage
+
+
+class LineSprite( pg.shapes.Line ):
+    """objet graphique de type ligne"""
+    def __init__(self, a, b, color, thickness):
+        super().__init__( *a, *b, width=thickness, 
+            color=color, 
             batch=batch(), 
             group=sprite_group(SPRITE_GROUP_GUI) )
+        self.anchor_position = (0, 0)
+
+    def __del__(self):
+        self.delete()   # supprime le sprite du batch graphique
+        super().__del__()
+
+    @classmethod
+    def wall(cls, a, b):
+        """Segments pour construire le bocal
+        """
+        return cls( a, b, thickness=20, color=WALL_COLOR)
+
+    @classmethod
+    def redline(cls, a, b):
+        """ Ligne rouge de niveau maxi
+        """
+        return cls( a, b, thickness=3, color=MAXLINE_COLOR)
 
 
 class SuikaSprite ( pg.sprite.Sprite ):

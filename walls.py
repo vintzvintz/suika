@@ -1,75 +1,103 @@
 import pymunk as pm
+import pyglet as pg
 from constants import *
-import sprites
+from sprites import LineSprite
 
 
-class MaxLine( object ):
+class BoxElement(object):
+    """ forme physique pymunk associée à un objet graphique
+    a et b sont les extrémités du segment (en coordonnées du body)
+    """
+    def __init__(self, body, a, b, collision_type, thickness ):
+        self.body = body
+        # objet graphique pyglet
+        l = self.make_sprite(a, b)
+        # objet physique pymunk
+        s = pm.Segment( body, a, b, radius=thickness )
+        s.collision_type = collision_type
+        self.segment, self.line = s, l
 
-    def __init__(self, space, height, width ):
-        self._space = space
-        self._body, self._shape = self.make_shape( height, width )
-        space.add(self._body, self._shape)
-        self._line = sprites.MaxLineSprite( height, width )
+    def update(self):
+        self.line.position = self.body.local_to_world( self.segment.a )
+        self.line.rotation = self.body.angle
 
-    def __del__(self):
-        self._space.remove( self._body, self._shape )
-
-
-    def make_shape(self, height, width):
-        # pymunk body - pour la simulation
-        body = pm.Body(body_type = pm.Body.STATIC)
-        body.position = (0, height)
-        # pymunk shape - pour la simulation
-        shape = pm.Segment(body, (0, 0), (width,0), radius=5 )
-        shape.filter = pm.ShapeFilter( 
-            categories=CAT_MAXLINE,
-            mask= pm.ShapeFilter.ALL_MASKS() ^ CAT_WALLS )
-        shape.collision_type = COLLISION_TYPE_MAXLINE
-        return body, shape
+    def make_sprite(self):
+        return NotImplementedError( "Instancier plutot Wall() ou MaxLine()" )
     
-    def fruits_en_contact(self):
-        sqi = self._space.shape_query( self._shape )
-        fruit = [ s.shape.fruit for s in sqi ]
-        return fruit
+
+class Wall( BoxElement ):
+    def __init__(self, body, a, b, collision_type ):
+        super().__init__(body, a, b, thickness=WALL_THICKNESS,
+                         collision_type=collision_type)
+        self.segment.filter= pm.ShapeFilter( categories=CAT_WALLS, 
+                                            mask=pm.ShapeFilter.ALL_MASKS() )
+        self.segment.elasticity = ELASTICITY_WALLS
+        self.segment.friction = FRICTION
+
+    def make_sprite(self, a, b):
+        return LineSprite.wall( a, b )
+
+
+class MaxLine( BoxElement ):
+    def __init__(self, body, height, length ):
+        a = (0, height)
+        b = (length, height)
+        super().__init__(body, a, b, thickness=3,
+                         collision_type=COLLISION_TYPE_MAXLINE)
+        self.segment.filter= pm.ShapeFilter( categories=CAT_MAXLINE, 
+                                            mask=pm.ShapeFilter.ALL_MASKS() ^ CAT_WALLS )
+        self.segment.sensor = True
+
+    def make_sprite(self, a, b):
+        return LineSprite.redline( a, b )
+
+
+LEFT = "left"
+RIGHT = "right"
+BOTTOM = "bottom"
+MAXLINE = "maxline"
+
+def _make_walls( body, width, height):
+    left = Wall( body, a=(0, 0), b=(0, height), collision_type=COLLISION_TYPE_WALL_SIDE )
+    bottom = Wall( body, a=(0, 0), b=(width, 0), collision_type=COLLISION_TYPE_WALL_BOTTOM )
+    right = Wall( body, a=(width, 0), b=(width, height), collision_type=COLLISION_TYPE_WALL_SIDE )
+    maxline = MaxLine( body, length=width, height=height-WINDOW_MAXLINE_MARGIN)
+    return {LEFT: left, BOTTOM: bottom, RIGHT: right, MAXLINE: maxline }
+
 
 
 class Walls(object):
     """ utilitaire pour creer les parois de l'espace de jeu (space)
     """
-    def __init__(self, space, width, height):
-        body = pm.Body(body_type=pm.Body.STATIC)
-        body.position = (0, 0)
-        wall_left = pm.Segment(body, (0, 0), (0, height+500), 1)          # left
-        wall_bottom = pm.Segment(body, (0, 0), (width, 0), 1)              # bottom
-        wall_right = pm.Segment(body, (width, 0), (width, height+500), 1)   # right
-        wall_bottom.collision_type = COLLISION_TYPE_WALL_BOTTOM
-        wall_left.collision_type = COLLISION_TYPE_WALL_SIDE
-        wall_right.collision_type = COLLISION_TYPE_WALL_SIDE
-        walls = [wall_bottom, wall_left, wall_right]
-        for s in walls:
-            s.friction = FRICTION
-            s.elasticity = ELASTICITY_WALLS
-            s.filter = pm.ShapeFilter( 
-                categories=CAT_WALLS,
-                mask=pm.ShapeFilter.ALL_MASKS() )
-        space.add( body, *walls )
-        maxline = MaxLine( space, height=height-WINDOW_MAXLINE_MARGIN, width=width )
+    def __init__(self, space, x0, y0, width, height):
 
+        b0 = pm.Body(body_type=pm.Body.STATIC)
+        b0.position = ( x0, y0 )
+        space.add( b0 )
+ 
+        self._walls = _make_walls(b0, width=width, height=height)
+        for w in self._walls.values():
+            space.add( w.segment )
         self._space = space
-        self._body = body
-        self._walls = walls
-        self._maxline = maxline
-
+        self._body = b0
+        self._maxline = self._walls[MAXLINE]
 
     def fruits_sur_maxline(self):
         """ Id des fruits en contact avec maxline
         """
-        return self._maxline.fruits_en_contact()
-    
+        sqi = self._space.shape_query( self._maxline.segment )
+        fruit = [ s.shape.fruit for s in sqi ]
+        return fruit
+
+    def update(self):
+        """ Met à jour les position des objets graphiques depuis la simulation physique
+        """
+        for w in self._walls.values():
+            w.update()
 
     def __del__(self):
-        self._space.remove( self._body, *self._walls)
-        #self._maxline deletes itself
+        self._space.remove( self._body )
+        #les elements de self._walls se suppriment eux-mêmes
 
 
 

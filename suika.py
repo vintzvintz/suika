@@ -18,7 +18,7 @@ class SuikaWindow(pg.window.Window):
         super().__init__(width, height)
         self._space = pm.Space( )
         self._space.gravity = (0, -100*GRAVITY)
-        self._walls = Walls(space=self._space, width=width, height=height)
+        self._walls = Walls(space=self._space, x0=100, y0=120, width=width-200, height=height)
         self._preview = FruitQueue(cnt=PREVIEW_COUNT)
         self._fruits = ActiveFruits( space=self._space )
 
@@ -134,6 +134,7 @@ class SuikaWindow(pg.window.Window):
         # met a jour les positions des fruits et les widgets du GUI
         self._fruits.update()
         self._preview.update()
+        self._walls.update()
         self.update_gui()
 
         # met à jour l'affichage
