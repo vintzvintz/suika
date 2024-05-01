@@ -231,6 +231,15 @@ class Fruit( object ):
     def position(self):
         return self._body.position
 
+    @position.setter
+    def position(self, pos):
+        assert self._body.body_type != pm.Body.DYNAMIC
+        self._body.position = pos
+
+    @property
+    def radius(self):
+        return self._shape.radius
+
     def _is_deleted(self):
         return (self._body==None 
             and self._shape==None
@@ -273,18 +282,7 @@ class Fruit( object ):
         for s in self._sprites.values():
             s.update( x=x, y=y, rotation=degres, on_animation_stop=None )
         self._shape.update_animation()
-        
 
-    def set_position(self, x, y):
-        assert( self._body.body_type == pm.Body.KINEMATIC ), "disponible seulement sur le fruit en attente"
-        assert( not y or (y>0 and y<WINDOW_HEIGHT))
-        # contrainte à l'interieur du jeu
-        x = max(x, self._shape.radius )
-        x = min(x, WINDOW_WIDTH - self._shape.radius)
-        (x0, y0) = self._body.position
-        if y is None:
-            y = y0
-        self._body.position = ( x, y )
 
 
     def blink(self, activate, delay=0):
@@ -294,9 +292,8 @@ class Fruit( object ):
             self._sprites[SPRITE_MAIN].blink = True
 
 
-    def drop(self,x):
+    def drop(self):
         """met l'objet en mode dynamique pour qu'il tombe et active les collisions"""
-        self.set_position(x=x, y=None)
         self._body.velocity = (0, -INITIAL_VELOCITY)
         self._set_mode( MODE_FIRST_DROP )
         self._shape.collision_type = COLLISION_TYPE_FIRST_DROP
@@ -398,10 +395,11 @@ class ActiveFruits(object):
         self._next_fruit = Fruit(space=self._space, kind=kind, on_remove=self.on_remove)
         # self.add() appelé dans play_next()
 
-    def play_next(self, x):
+    def play_next(self, position):
         if( (not self._next_fruit) or self._is_gameover ):
             return
-        self._next_fruit.drop(x=x)
+        self._next_fruit.position = position
+        self._next_fruit.drop()
         self.add( self._next_fruit )
         self._next_fruit = None
 
@@ -424,12 +422,13 @@ class ActiveFruits(object):
             self._next_fruit.remove()
             self._next_fruit = None
 
-    def autoplay_once(self, nb):
+    def autoplay_once(self, nb, position_func):
         assert( not self._is_gameover )
         for _ in range(nb):
             f = Fruit( self._space, on_remove=self.on_remove )
             self.add(f)
-            f.drop(x=random.randint(0, WINDOW_WIDTH))
+            f.position = position_func(margin=f.radius)
+            f.drop()
 
     def spawn(self, kind, position):
         f =  Fruit( space = self._space,

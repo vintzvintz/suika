@@ -3,7 +3,7 @@ import pyglet as pg
 import pymunk as pm
 
 from constants import *
-from walls import Walls
+from bocal import Bocal
 from fruit import ActiveFruits
 import gui
 from collision import CollisionHelper
@@ -18,7 +18,7 @@ class SuikaWindow(pg.window.Window):
         super().__init__(width, height)
         self._space = pm.Space( )
         self._space.gravity = (0, -100*GRAVITY)
-        self._walls = Walls(space=self._space, x0=100, y0=120, width=width-200, height=height)
+        self._bocal = Bocal(space=self._space, x0=100, y0=20, width=width-200, height=height-200)
         self._preview = FruitQueue(cnt=PREVIEW_COUNT)
         self._fruits = ActiveFruits( space=self._space )
 
@@ -52,8 +52,8 @@ class SuikaWindow(pg.window.Window):
     def autoplay(self, dt):
         if( not self._is_autoplay or self._is_paused or self._is_gameover ):
             return
-        self._fruits.autoplay_once(nb=AUTOPLAY_FLOW)
-
+        self._fruits.autoplay_once(nb=AUTOPLAY_FLOW, 
+                                   position_func=self._bocal.drop_point_random )
 
     def gameover(self):
         """ Actions en cas de partie perdue
@@ -79,12 +79,15 @@ class SuikaWindow(pg.window.Window):
 
 
     def shoot_fruit(self, x, y):
+        print(f"right click x={x} y={y}")
         qi = self._space.point_query( (x, y), max_distance=0, shape_filter=pm.ShapeFilter() )
-        if( len(qi)>0 ):
-            f = qi[0].shape.fruit
-            print(f"{f} right click x={x} y={y}")
-            if( not self._is_gameover ):
-                f.explose()
+        if( len(qi)==0 ):
+            return
+        if( not hasattr( qi[0].shape, 'fruit' )):
+           return
+        f = qi[0].shape.fruit
+        if( not self._is_gameover ):
+            f.explose()
 
 
     def update_pymunk(self, dt):
@@ -94,6 +97,9 @@ class SuikaWindow(pg.window.Window):
         self.pymunk_fps.tick_rel(dt)
         if( self._is_paused ):
             return
+        
+        # secoue le bocal
+        self._bocal.update_walls(dt)
         # prepare le gestionnaire de collisions
         self._collision_helper.reset()
         # execute 1 pas de simulation physique
@@ -106,7 +112,7 @@ class SuikaWindow(pg.window.Window):
 
     def update_gui(self):
         # gere le countdown en cas de débordement
-        ids = self._walls.fruits_sur_maxline()
+        ids = self._bocal.fruits_sur_maxline()
         self._countdown.update( ids )
 
         # met à jour l'affichage et détecte la fin de partie
@@ -134,7 +140,7 @@ class SuikaWindow(pg.window.Window):
         # met a jour les positions des fruits et les widgets du GUI
         self._fruits.update()
         self._preview.update()
-        self._walls.update()
+        self._bocal.update_sprites()
         self.update_gui()
 
         # met à jour l'affichage
@@ -154,13 +160,20 @@ class SuikaWindow(pg.window.Window):
             self.reset_game()
         elif(symbol == pg.window.key.A):           # A controle l'autoplay
             self.toggle_autoplay()
-        elif(symbol == pg.window.key.SPACE):        # SPACE met le jeu en pause
+        elif(symbol == pg.window.key.SPACE):        # SPACE secoue le bocal
+            self._bocal.shake = True
+        elif(symbol == pg.window.key.P):        # P met le jeu en pause
             self.toggle_pause()
-        elif(symbol == pg.window.key.G):        # force un gameover en cours de partie
+        elif(symbol == pg.window.key.G):        # G force un gameover en cours de partie
             self.gameover()
         else:
             return pg.event.EVENT_UNHANDLED
         return pg.event.EVENT_HANDLED
+
+
+    def on_key_release(self, symbol, modifiers):
+        if(symbol == pg.window.key.SPACE):        # SPACE secoue le bocal
+            self._bocal.shake = False
 
 
     def on_mouse_press(self, x, y, button, modifiers):
@@ -177,7 +190,9 @@ class SuikaWindow(pg.window.Window):
 
         # laĉhe le next_fruit
         if( (button & pg.window.mouse.LEFT) and not self._is_gameover ):
-            self._fruits.play_next(x=x)
+            pos = self._bocal.drop_point_from_clic( x, force_inside=False )
+            if(pos):
+                self._fruits.play_next(pos)
             if( not self._is_autoplay ):
                 pg.clock.schedule_once( lambda dt: self.prepare_next(), delay=NEXT_FRUIT_INTERVAL)
 
