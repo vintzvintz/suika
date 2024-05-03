@@ -50,13 +50,13 @@ class LineSprite( pg.shapes.Line ):
     def wall(cls, a, b):
         """Segments pour construire le bocal
         """
-        return cls( a, b, thickness=20, color=WALL_COLOR)
+        return cls( a, b, thickness=WALL_THICKNESS, color=WALL_COLOR)
 
     @classmethod
     def redline(cls, a, b):
         """ Ligne rouge de niveau maxi
         """
-        return cls( a, b, thickness=3, color=MAXLINE_COLOR)
+        return cls( a, b, thickness=REDLINE_THICKNESS, color=REDLINE_COLOR)
 
 
 class SuikaSprite ( pg.sprite.Sprite ):

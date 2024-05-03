@@ -34,6 +34,8 @@ SHAKE_ACCEL_DELAY = 1   # secondes
 SHAKE_AMPLITUDE_X = 50
 SHAKE_AMPLITUDE_Y = 60
 
+TUMBLE_FREQ = 0.19    # Hz
+
 COUNTDOWN_DISPLAY_LIMIT = 3.0   # secondes
 GAMEOVER_DELAY = 4.0         # secondes
 
@@ -51,9 +53,11 @@ EXPLOSION_DELAY = 0.3
 MERGE_DELAY = 0.1
 SPAWN_DELAY = 0.3
 
-WALL_THICKNESS = 13
+WALL_THICKNESS = 20
 WALL_COLOR = (205,200,255,255)
-MAXLINE_COLOR= (255,20,20,255) 
+
+REDLINE_THICKNESS = 4
+REDLINE_COLOR= (255,20,20,255) 
 
 
 # Identifiants pour dispatcher les collisions sur la logique de jeu ( collision_handler )

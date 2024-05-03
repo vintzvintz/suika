@@ -16,6 +16,9 @@ SHAKE_AUTO='auto'
 SHAKE_MOUSE='mouse'
 SHAKE_STOPPING='stopping'
 
+TUMBLE_OFF='off'
+TUMBLE_ONCE='once'
+
 
 class BoxElement(object):
     """ forme physique pymunk associée à un objet graphique
@@ -26,7 +29,7 @@ class BoxElement(object):
         # objet graphique pyglet
         l = self.make_sprite(a, b)
         # objet physique pymunk
-        s = pm.Segment( body, a, b, radius=thickness )
+        s = pm.Segment( body, a, b, radius=thickness/2 )
         s.collision_type = collision_type
         self.segment, self.line = s, l
 
@@ -68,8 +71,6 @@ class MaxLine( BoxElement ):
 
     def make_sprite(self, a, b):
         return LineSprite.redline( a, b )
-
-
 
 
 
@@ -156,9 +157,13 @@ class Bocal(object):
         self._body = b0
         self._maxline = self._walls[MAXLINE]
         self._dropzone = DropZone(body=b0, height=center[1]/2-100, length=width)
+
         self._shake = SHAKE_OFF
         self._shake_start_time = None     # t0 pour la secousse automatique
         self._shake_mouse_target = None   # position du bocal a atteidre en mode SHAKE_MOUSE
+        
+        self._tumble = TUMBLE_OFF
+        self._tumble_start_time = None   
 
 
     def reset(self):
@@ -183,15 +188,21 @@ class Bocal(object):
         self._shake = SHAKE_AUTO
         self._shake_start_time = utils.now()
 
+
     def shake_mouse(self):
         self._shake = SHAKE_MOUSE
         self._shake_mouse_target = self._position_ref
+
 
     def shake_stop(self):
         self._shake = SHAKE_STOPPING
         self._shake_start_time = None
         self._shake_mouse_target = None
 
+
+    def tumble_once(self):
+        self._tumble = TUMBLE_ONCE
+        self._tumble_start_time = utils.now()
 
     def fruits_sur_maxline(self):
         """ Id des fruits en contact avec maxline
@@ -200,7 +211,13 @@ class Bocal(object):
         fruit = [ s.shape.fruit for s in sqi ]
         return fruit
 
+
     def update_walls(self, dt):
+        self._update_shake(dt)
+        self._update_tumble(dt)
+
+
+    def _update_shake(self, dt):
         """ secoue le bocal
         """
         if(self._shake==SHAKE_OFF):
@@ -237,6 +254,21 @@ class Bocal(object):
             velocity =  dist / (dt*3) 
 
         self._body.velocity = velocity
+
+
+    def _update_tumble(self, dt):
+        """ mode machine à laver: rotation du bocal
+        """
+        if( self._tumble == TUMBLE_OFF):
+            return 
+        elif( self._tumble == TUMBLE_ONCE):
+            t = utils.now() - self._tumble_start_time
+            angle = 2 * math.pi * TUMBLE_FREQ * t
+            if( angle > 2*math.pi):
+                angle = 0
+                self._tumble = TUMBLE_OFF
+                self._tumble_start_time = None
+            self._body.angle = angle
 
 
     def update_sprites(self):

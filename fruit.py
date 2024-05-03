@@ -46,6 +46,7 @@ COLLISION_MASK = 'coll_mask'
 BODY_TYPE = 'body_type'
 VISI = 'visi'
 
+
 _FRUIT_MODES = {
     MODE_WAIT: {
         COLLISION_CAT: CAT_FRUIT_WAIT,

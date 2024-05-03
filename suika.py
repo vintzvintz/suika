@@ -54,7 +54,7 @@ class SuikaWindow(pg.window.Window):
 
 
     def autoplay(self, dt):
-        if( not self._is_autoplay or not self._is_autoclic or self._is_paused or self._is_gameover ):
+        if( not self._is_autoplay or self._is_paused or self._is_gameover ):
             return
         
         if( self._is_autoplay ):
@@ -173,8 +173,10 @@ class SuikaWindow(pg.window.Window):
             self.reset_game()
         elif(symbol == pg.window.key.A):           # A controle l'autoplay
             self.toggle_autoplay()
-        elif(symbol == pg.window.key.C):           # A controle l'autoplay
-            self.autoclic_start()
+        # elif(symbol == pg.window.key.C):           # Autoclic
+        #     self.autoclic_start()
+        elif(symbol == pg.window.key.T):           # Autoclic
+            self._bocal.tumble_once()
         elif(symbol == pg.window.key.S):        # S secoue le bocal automatiquement
             self._bocal.shake_auto()
         elif(symbol == pg.window.key.SPACE):        # SPACE met en mode MOUSE_SHAKE
@@ -195,8 +197,8 @@ class SuikaWindow(pg.window.Window):
             self.pop_handlers()
         if(symbol == pg.window.key.S):       # arrete de secouee le bocal automatiquement
             self._bocal.shake_stop()
-        if(symbol == pg.window.key.C):           # arrete l'autoclic
-            self.autoclic_stop()
+        # if(symbol == pg.window.key.C):           # arrete l'autoclic
+        #     self.autoclic_stop()
 
 
     def on_mouse_press(self, x, y, button, modifiers):
