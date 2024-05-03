@@ -156,7 +156,7 @@ class Bocal(object):
         self._space = space
         self._body = b0
         self._maxline = self._walls[MAXLINE]
-        self._dropzone = DropZone(body=b0, height=center[1]/2-100, length=width)
+        self._dropzone = DropZone(body=b0, height=height/2-100, length=width)
 
         self._shake = SHAKE_OFF
         self._shake_start_time = None     # t0 pour la secousse automatique

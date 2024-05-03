@@ -12,6 +12,10 @@ from preview import FruitQueue
 import sprites
 
 
+AUTOPLAY_RANDOM ='random'
+AUTOPLAY_MOUSE = 'mouse'
+
+
 class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
         super().__init__(width, height)
@@ -19,7 +23,8 @@ class SuikaWindow(pg.window.Window):
         self._space.gravity = (0, -100*GRAVITY)
         self._bocal = Bocal(space=self._space, 
                             center=pm.Vec2d(width/2, height/2),
-                            width=width-BOCAL_MARGIN, height=height-BOCAL_MARGIN)
+                            width=width-BOCAL_MARGIN,
+                            height=height-BOCAL_MARGIN)
         self._preview = FruitQueue(cnt=PREVIEW_COUNT)
         self._fruits = ActiveFruits( space=self._space )
 
@@ -36,8 +41,7 @@ class SuikaWindow(pg.window.Window):
     def reset_game(self):
         self._is_gameover = False
         self._is_paused = False
-        self._is_autoplay = False
-        self._is_autoclic = False
+        self._autoplay = None
         self._is_mouse_shake = False
         self._bocal.reset()
         self._preview.reset()
@@ -54,15 +58,16 @@ class SuikaWindow(pg.window.Window):
 
 
     def autoplay(self, dt):
-        if( not self._is_autoplay or self._is_paused or self._is_gameover ):
+        if( not self._autoplay or self._is_paused or self._is_gameover ):
             return
         
-        if( self._is_autoplay ):
-            self._fruits.autoplay_once(nb=AUTOPLAY_FLOW, 
-                                   position_func=self._bocal.drop_point_random )
-        elif( self._is_autoclic ):
-            self._fruit
-
+        if( self._autoplay == AUTOPLAY_RANDOM ):
+            #self._fruits.autoplay_once( position_func=self._bocal.drop_point_random )
+            position_func=self._bocal.drop_point_random
+        # elif( self._autoplay == AUTOPLAY_MOUSE ):
+        #     pg.window.MouseCursor
+        #     position_func = lambda margin : self._bocal.drop_point_from_clic(x_clic=xxx, margin) 
+        self._fruits.autoplay_once( position_func )
 
     def gameover(self):
         """ Actions en cas de partie perdue
@@ -75,10 +80,13 @@ class SuikaWindow(pg.window.Window):
 
     def toggle_autoplay(self):
         assert( not self._is_gameover )
-        self._is_autoplay = not self._is_autoplay
-        if( self._is_autoplay ):
+        #self._autoplay = not self._is_autoplay
+
+        if( not self._autoplay ):
+            self._autoplay = AUTOPLAY_RANDOM
             self._fruits.remove_next()
-        if( not self._is_autoplay ):
+        elif( self._autoplay == AUTOPLAY_RANDOM):
+            self._autoplay = None
             self.prepare_next()
 
 
@@ -135,7 +143,7 @@ class SuikaWindow(pg.window.Window):
 
         # l'ordre des conditions définit la priorité des messages
         game_status = ""
-        if( self._is_autoplay ):  game_status = "AUTOPLAY"
+        if( self._autoplay ):     game_status = "AUTOPLAY"
         if( countdown_txt ):      game_status = countdown_txt
         if( self._is_paused ):    game_status = "PAUSE"
         if( self._is_gameover ):  game_status = "GAME OVER"
@@ -223,8 +231,14 @@ class SuikaWindow(pg.window.Window):
             if( not pos ):
                 return
             self._fruits.drop_next(pos)
-            if( not self._is_autoplay ):
+            if( not self._autoplay ):
                 pg.clock.schedule_once( lambda dt: self.prepare_next(), delay=NEXT_FRUIT_INTERVAL)
+
+
+
+
+    #def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
+    #     if(self.)
 
 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):

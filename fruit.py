@@ -426,13 +426,12 @@ class ActiveFruits(object):
             self._next_fruit.remove()
             self._next_fruit = None
 
-    def autoplay_once(self, nb, position_func):
+    def autoplay_once(self, position_func):
         assert( not self._is_gameover )
-        for _ in range(nb):
-            f = Fruit( self._space, on_remove=self.on_remove )
-            self.add(f)
-            f.position = position_func(margin=f.radius)
-            f.drop()
+        f = Fruit( self._space, on_remove=self.on_remove )
+        self.add(f)
+        f.position = position_func(margin=f.radius)
+        f.drop()
 
     def spawn(self, kind, position):
         f =  Fruit( space = self._space,
