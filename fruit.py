@@ -395,7 +395,7 @@ class ActiveFruits(object):
         self._next_fruit = Fruit(space=self._space, kind=kind, on_remove=self.on_remove)
         # self.add() appelé dans play_next()
 
-    def play_next(self, position):
+    def drop_next(self, position):
         if( (not self._next_fruit) or self._is_gameover ):
             return
         self._next_fruit.position = position

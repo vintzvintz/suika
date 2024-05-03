@@ -8,6 +8,7 @@ import utils
 LEFT = "left"
 RIGHT = "right"
 BOTTOM = "bottom"
+TOP= "top"
 MAXLINE = "maxline"
 
 SHAKE_OFF='off'
@@ -57,8 +58,8 @@ class Wall( BoxElement ):
 
 class MaxLine( BoxElement ):
     def __init__(self, body, height, length ):
-        a = (0, height)
-        b = (length, height)
+        a = (-length/2, height)
+        b = (+length/2, height)
         super().__init__(body, a, b, thickness=3,
                          collision_type=COLLISION_TYPE_MAXLINE)
         self.segment.filter= pm.ShapeFilter( categories=CAT_MAXLINE, 
@@ -70,13 +71,6 @@ class MaxLine( BoxElement ):
 
 
 
-def _make_walls( body, width, height):
-    left = Wall( body, a=(0, 0), b=(0, height), collision_type=COLLISION_TYPE_WALL_SIDE )
-    bottom = Wall( body, a=(0, 0), b=(width, 0), collision_type=COLLISION_TYPE_WALL_BOTTOM )
-    right = Wall( body, a=(width, 0), b=(width, height), collision_type=COLLISION_TYPE_WALL_SIDE )
-    maxline = MaxLine( body, length=width, height=height-WINDOW_MAXLINE_MARGIN)
-    return {LEFT: left, BOTTOM: bottom, RIGHT: right, MAXLINE: maxline }
-
 
 
 class DropZone(object):
@@ -84,8 +78,8 @@ class DropZone(object):
     """
     def __init__(self, body, height, length):
         self._body = body
-        self._left = pm.Vec2d(0, height)
-        self._right = pm.Vec2d(length, height)
+        self._left = pm.Vec2d(-length/2, height)
+        self._right = pm.Vec2d(+length/2, height)
 
 
     def _drop_point_interpolate(self, r):
@@ -129,24 +123,39 @@ class DropZone(object):
 
 
 
+def _make_walls( body, center, width, height):
+
+    top_right = center + (width/2, height/2)
+    top_left  = center + (-width/2, height/2)
+    bot_right = center + (width/2, -height/2)
+    bot_left  = center + (-width/2, -height/2)
+
+    left = Wall( body, a=bot_left, b=top_left, collision_type=COLLISION_TYPE_WALL_SIDE )
+    bottom = Wall( body, a=bot_left, b=bot_right, collision_type=COLLISION_TYPE_WALL_BOTTOM )
+    right = Wall( body, a=bot_right, b=top_right, collision_type=COLLISION_TYPE_WALL_SIDE )
+    top = Wall( body, a=top_left, b=top_right, collision_type=COLLISION_TYPE_WALL_BOTTOM )
+    maxline = MaxLine( body, length=width, height=height/2-WINDOW_MAXLINE_MARGIN)
+    return {LEFT: left, BOTTOM: bottom, RIGHT: right, TOP: top, MAXLINE: maxline }
+
+
 class Bocal(object):
     """ utilitaire pour creer les parois de l'espace de jeu (space)
     """
-    def __init__(self, space, x0, y0, width, height):
+    def __init__(self, space, center, width, height):
 
         b0 = pm.Body(body_type=pm.Body.KINEMATIC)
-        self._position_ref = (x0, y0)
-        b0.position = (x0, y0)
+        self._position_ref = center
+        b0.position = center
         #b0.angle = math.pi/12
         space.add( b0 )
  
-        self._walls = _make_walls(b0, width=width, height=height)
+        self._walls = _make_walls(body=b0, center=pm.Vec2d(0,0), width=width, height=height)
         for w in self._walls.values():
             space.add( w.segment )
         self._space = space
         self._body = b0
         self._maxline = self._walls[MAXLINE]
-        self._dropzone = DropZone(body=b0, height=height-100, length=width)
+        self._dropzone = DropZone(body=b0, height=center[1]/2-100, length=width)
         self._shake = SHAKE_OFF
         self._shake_start_time = None     # t0 pour la secousse automatique
         self._shake_mouse_target = None   # position du bocal a atteidre en mode SHAKE_MOUSE
@@ -227,7 +236,6 @@ class Bocal(object):
             dist = self._shake_mouse_target - self._body.position
             velocity =  dist / (dt*3) 
 
-        
         self._body.velocity = velocity
 
 
