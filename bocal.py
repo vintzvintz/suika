@@ -202,7 +202,7 @@ class Bocal(object):
 
     def tumble_once(self):
         self._tumble = TUMBLE_ONCE
-        self._tumble_start_time = utils.now()
+        self._body.angular_velocity =  2 * math.pi * TUMBLE_FREQ
 
     def fruits_sur_maxline(self):
         """ Id des fruits en contact avec maxline
@@ -262,13 +262,11 @@ class Bocal(object):
         if( self._tumble == TUMBLE_OFF):
             return 
         elif( self._tumble == TUMBLE_ONCE):
-            t = utils.now() - self._tumble_start_time
-            angle = 2 * math.pi * TUMBLE_FREQ * t
-            if( angle > 2*math.pi):
-                angle = 0
+            if( self._body.angle > 2*math.pi):
+                self._body.angle = 0
+                self._body.angular_velocity = 0
                 self._tumble = TUMBLE_OFF
                 self._tumble_start_time = None
-            self._body.angle = angle
 
 
     def update_sprites(self):
@@ -280,14 +278,12 @@ class Bocal(object):
 
     def on_mouse_motion(self, x, y, dx, dy):
         if(self._shake==SHAKE_MOUSE):
-#            print(f"before shaking => target={self._shake_mouse_target} dx={dx} dy={dy}")
             dv = pm.Vec2d(dx, dy)/3
             (xt, yt) = self._shake_mouse_target + dv
             (x_ref, y_ref) =  self._position_ref
             xt = min( max(xt, x_ref - SHAKE_AMPLITUDE_X ), x_ref + SHAKE_AMPLITUDE_X)
             yt = min( max(yt, y_ref - SHAKE_AMPLITUDE_Y ), y_ref + SHAKE_AMPLITUDE_Y)
             self._shake_mouse_target = (xt, yt)
-#            print(f"after shaking  => target={self._shake_mouse_target}")
 
 
     def drop_point_from_clic(self, x_clic, margin ):

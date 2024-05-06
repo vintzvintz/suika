@@ -23,14 +23,14 @@ class FruitQueue( object ):
 
     def reset(self):
         self._queue = []
-        self._add_item(nb = PREVIEW_COUNT)
+        for _ in range(PREVIEW_COUNT):
+            self._add_item()
         self._shift_end_time = None
         self.update()
 
-    def _add_item(self, nb=1):
-        for _ in range(nb):
-            s = QueueItem( kind = fruit.random_kind(), width=PREVIEW_SPRITE_SIZE )
-            self._queue.insert(0, s)
+    def _add_item(self):
+        s = QueueItem( kind = fruit.random_kind(), width=PREVIEW_SPRITE_SIZE )
+        self._queue.insert(0, s)
 
     def get_next_fruit(self):
         kind = self._queue.pop().kind

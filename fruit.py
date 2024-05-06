@@ -349,7 +349,8 @@ class Fruit( object ):
         if self._is_deleted():
             return False
         x, y = self._body.position
-        return   (x < 0) or (y < 0) or (x>WINDOW_WIDTH) or (y>WINDOW_HEIGHT)
+        #return   (x < 0) or (y < 0) or (x>WINDOW_WIDTH) or (y>WINDOW_HEIGHT)
+        return y < -WINDOW_HEIGHT 
     
     # retire le fruit du jeu. l'objet ne doit plus être utilisé ensuite.
     def remove(self):
@@ -371,7 +372,6 @@ class ActiveFruits(object):
 
     def __len__(self):
         return len(self._fruits)
-
 
     def reset(self):
         self._is_gameover = False
@@ -426,18 +426,12 @@ class ActiveFruits(object):
             self._next_fruit.remove()
             self._next_fruit = None
 
-    def autoplay_once(self, position_func):
-        assert( not self._is_gameover )
-        f = Fruit( self._space, on_remove=self.on_remove )
-        self.add(f)
-        f.position = position_func(margin=f.radius)
-        f.drop()
 
     def spawn(self, kind, position):
-        f =  Fruit( space = self._space,
-                     kind=kind,
-                     position=position,
-                     on_remove=self.on_remove)
+        f =  Fruit( space=self._space,
+                    kind=kind,
+                    position=position,
+                    on_remove=self.on_remove)
         self.add(f)
         f.fade_in()
         return f
