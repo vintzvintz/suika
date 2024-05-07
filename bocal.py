@@ -182,6 +182,10 @@ class Bocal(object):
     def width(self):
         bot = self._walls[BOTTOM].segment
         return (bot.b - bot.a).length
+    
+    @property
+    def is_tumbling(self):
+        return self._tumble != TUMBLE_OFF
 
 
     def shake_auto(self):

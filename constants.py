@@ -36,7 +36,7 @@ SHAKE_ACCEL_DELAY = 1   # secondes
 SHAKE_AMPLITUDE_X = 50
 SHAKE_AMPLITUDE_Y = 60
 
-TUMBLE_FREQ = 0.33    # Hz
+TUMBLE_FREQ = 0.25    # Hz
 
 COUNTDOWN_DISPLAY_LIMIT = 3.0   # secondes
 GAMEOVER_DELAY = 5.0            # secondes

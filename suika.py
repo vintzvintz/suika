@@ -28,7 +28,7 @@ class SuikaWindow(pg.window.Window):
         self._countdown = utils.CountDown()
         self._labels = gui.Labels( window_width=width, window_height=height )
         self._collision_helper = CollisionHelper(self._space)
-        pg.clock.schedule_interval( self.update_pymunk, interval=PYMUNK_INTERVAL )
+        pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
         self.display_fps = utils.Speedmeter()
         self.pymunk_fps = utils.Speedmeter()
@@ -125,7 +125,7 @@ class SuikaWindow(pg.window.Window):
             f.explose()
 
 
-    def update_pymunk(self, dt):
+    def simulation_step(self, dt):
         """Avance d'un pas la simulation physique
         appelé par un timer dedié indépendant et plus rapide que window.on_draw()
         """
@@ -147,8 +147,9 @@ class SuikaWindow(pg.window.Window):
 
     def update_gui(self):
         # gere le countdown en cas de débordement
-        ids = self._bocal.fruits_sur_maxline()
-        self._countdown.update( ids )
+        if( not self._bocal.is_tumbling):
+            ids = self._bocal.fruits_sur_maxline()
+            self._countdown.update( ids )
 
         # met à jour l'affichage et détecte la fin de partie
         countdown_val, countdown_txt = self._countdown.status()
@@ -196,6 +197,7 @@ class SuikaWindow(pg.window.Window):
         elif(symbol == pg.window.key.A):           # A controle l'autoplay
             self.toggle_autoplay()
         elif(symbol == pg.window.key.T):           # Mode machine à laver
+            self._countdown.update( deborde=False )
             self._bocal.tumble_once()
         elif(symbol == pg.window.key.S):        # S secoue le bocal automatiquement
             self._bocal.shake_auto()

@@ -57,7 +57,7 @@ class CountDown(object):
         t = self._start_time + GAMEOVER_DELAY - now()
         text = ""
         if( t <  COUNTDOWN_DISPLAY_LIMIT ):
-            text = f"Defaite dans {t:.01f}s"
+            text = f"Défaite dans {t:.01f}s"
         return (t, text)
 
 
