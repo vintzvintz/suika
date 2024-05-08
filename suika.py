@@ -125,9 +125,14 @@ class SuikaWindow(pg.window.Window):
             f.explose()
 
 
+    def spawn_in_bocal(self, kind, bocal_coords):
+        position = self._bocal.to_world( bocal_coords )
+        self._fruits.spawn( kind, position )
+
+
     def simulation_step(self, dt):
         """Avance d'un pas la simulation physique
-        appelé par un timer dedié indépendant et plus rapide que window.on_draw()
+        appelé par un timer de window.on_draw()
         """
         self.pymunk_fps.tick_rel(dt)
         if( self._is_paused ):
@@ -140,7 +145,7 @@ class SuikaWindow(pg.window.Window):
         # execute 1 pas de simulation physique
         self._space.step( PYMUNK_INTERVAL )  
         # modifie les fruits selon les collisions détectées
-        self._collision_helper.process( spawn_func=self._fruits.spawn )
+        self._collision_helper.process( spawn_func=self.spawn_in_bocal, world_to_bocal_func=self._bocal.to_bocal )
         # menage 
         self._fruits.cleanup()
 

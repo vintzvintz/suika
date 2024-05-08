@@ -178,6 +178,12 @@ class Bocal(object):
         #les elements de self._walls se suppriment eux-mêmes
 
 
+    def to_world(self, bocal_coords):
+        return self._body.local_to_world(bocal_coords)
+
+    def to_bocal(self, world_coords):
+        return self._body.world_to_local(world_coords)
+
     @property
     def width(self):
         bot = self._walls[BOTTOM].segment

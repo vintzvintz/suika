@@ -124,7 +124,7 @@ class CollisionHelper(object):
         return composantes
 
 
-    def _process_collisions(self, spawn_func):
+    def _process_collisions(self, spawn_func, world_to_bocal_func):
         """ modifie les fruits selon collisions apparues pendant pymunk.step()
         """
         # traite les explosions 
@@ -144,13 +144,13 @@ class CollisionHelper(object):
             # remplace les fruits explosés par un seul nouveau fruit de taille supérieure
             # copie les infos car f0 peut être REMOVED quand spawn() sera appelée
             kind = min( f0.kind + 1, nb_fruits() )
-            position = f0.position
-            spawn_fruit = lambda dt : spawn_func(kind=kind, position=position ) 
+            bocal_coords = world_to_bocal_func( f0.position )
+            spawn_fruit = lambda dt : spawn_func(kind=kind, bocal_coords=bocal_coords)
             pg.clock.schedule_once( spawn_fruit, delay=SPAWN_DELAY )
 
 
-    def process(self, spawn_func):
-        self._process_collisions(spawn_func)
+    def process(self, spawn_func, world_to_bocal_func):
+        self._process_collisions(spawn_func, world_to_bocal_func)
 
         # exectude les actions sur les fruits existants ( explose(), blink(), etc... )
         for action in self._actions:
@@ -164,10 +164,6 @@ class CollisionHelper(object):
         for kind in range(1, nb_fruits()+1):
             h = space.add_collision_handler(kind, kind)
             h.begin = lambda arbiter, space, data : self.collision_fruit(arbiter)
-
-        # # ignore les collisions entre un fruit FIRST_DROP et les murs latéraux
-        # h = space.add_collision_handler( COLLISION_TYPE_FIRST_DROP, COLLISION_TYPE_WALL_SIDE )
-        # h.begin = lambda arbiter, space, data: True
 
         # collisions des fruits FIRST_DROP avec les fruits normaux ou le sol
         h = space.add_wildcard_collision_handler( COLLISION_TYPE_FIRST_DROP )
