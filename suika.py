@@ -92,7 +92,7 @@ class SuikaWindow(pg.window.Window):
         print("GAMEOVER")
         self._is_gameover = True    # inhibe les actions de jeu
         self._fruits.gameover()
-        self._labels.show_gameover()
+        self._gui.show_gameover()
 
 
     def toggle_autoplay(self):
