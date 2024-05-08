@@ -118,6 +118,8 @@ class SuikaWindow(pg.window.Window):
         qi = self._space.point_query( (x, y), max_distance=0, shape_filter=pm.ShapeFilter() )
         if( len(qi)==0 ):
             return
+        if( len(qi) > 1):
+            print("WARNING: pluiseurs fruits superposés ??")
         if( not hasattr( qi[0].shape, 'fruit' )):
            return
         f = qi[0].shape.fruit
@@ -175,8 +177,6 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_draw(self):
-        if( utils.g_fruit_cnt.cnt - len(self._fruits) > 5 ):
-            print( f"Ressource leak {utils.print_counters()}" )
 
         # met a jour les positions des fruits et les widgets du GUI
         self._fruits.update()

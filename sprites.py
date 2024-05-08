@@ -65,10 +65,6 @@ class SuikaSprite ( pg.sprite.Sprite ):
         self._fadeout_start = None
         self._visibility = VISI_NORMAL
 
-    def __del__(self):
-        self.delete()              # removes sprite from pyglet graphics batch
-        super().__del__()
-
     @property
     def fadein(self):
         return bool(self._fadein_start)
@@ -172,8 +168,6 @@ class FruitSprite( SuikaSprite ):
     def __init__(self, nom, r, group=None):
         """  sprite pyglet associé à l'objet physique
         """
-        self._refcnt_f = utils.g_fruit_sprite_cnt
-        self._refcnt_f.inc()
         if( group is None ):
             group = sprite_group(SPRITE_GROUP_FRUITS)
         img = pg.resource.image( f"{nom}.png" )
@@ -185,24 +179,13 @@ class FruitSprite( SuikaSprite ):
                          batch=batch(), 
                          group=sprite_group(SPRITE_GROUP_FRUITS) )
 
-    def __del__(self):
-        self._refcnt_f.dec()
-        super().__del__()
-
 
 class PreviewSprite( FruitSprite ):
     def __init__(self, nom, width=PREVIEW_SPRITE_SIZE, refcnt=None ):
-        self._refcnt_pv = utils.g_preview_sprite_cnt
-        self._refcnt_pv.inc()
         super().__init__(nom, r=width/2, group=sprite_group(SPRITE_GROUP_GUI) )
 
     def update(self, x, y):
          super().update( x=x, y=y, rotation=0, on_animation_stop=None )
-
-    def __del__(self):
-        self._refcnt_pv.dec()
-        super().__del__()
-
 
 
 ## Explosion
@@ -230,6 +213,23 @@ EXPLO_CENTRES = ligne1+ligne2
 EXPLO_SIZE = 256
 EXPLO_PNG = "explosion.png"
 
+
+def _make_sequence():
+    img = pg.resource.image(EXPLO_PNG)
+    seq = []
+    for (x,y) in EXPLO_CENTRES:
+        region = img.get_region( x=x-EXPLO_SIZE//2, y=y-EXPLO_SIZE//2, 
+                                    width=EXPLO_SIZE, height=EXPLO_SIZE )
+        region.anchor_x = EXPLO_SIZE//2
+        region.anchor_y = EXPLO_SIZE//2
+        seq.append(region)
+    return pg.image.Animation.from_image_sequence( 
+        sequence=seq, 
+        loop=False,
+        duration=EXPLOSION_DELAY / len(seq))
+    
+_sequence_explosion = _make_sequence()
+
 class ExplosionSprite( SuikaSprite ):
     def __init__(self, r, on_explosion_end):
         # setup callback
@@ -239,23 +239,9 @@ class ExplosionSprite( SuikaSprite ):
         scale = 2.5 * r / EXPLO_SIZE
         self._scale_ref = ( scale, scale )
 
-    def _make_animation(self):
-        img = pg.resource.image("explosion.png")
-        seq = []
-        for (x,y) in EXPLO_CENTRES:
-            region = img.get_region( x=x-EXPLO_SIZE//2, y=y-EXPLO_SIZE//2, 
-                                     width=EXPLO_SIZE, height=EXPLO_SIZE )
-            region.anchor_x = EXPLO_SIZE//2
-            region.anchor_y = EXPLO_SIZE//2
-            seq.append(region)
-        return pg.image.Animation.from_image_sequence( 
-            sequence=seq, 
-            loop=False,
-            duration=EXPLOSION_DELAY / len(seq))
-    
 
     def _make_animated_sprite(self, r):
-        super().__init__(img=self._make_animation(),
+        super().__init__(img=_sequence_explosion,
                          batch = batch(),
                          group=sprite_group(SPRITE_GROUP_EXPLOSIONS))
         self.opacity=128

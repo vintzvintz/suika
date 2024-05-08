@@ -131,9 +131,6 @@ class AnimatedCircle( pm.Circle ):
 
 class Fruit( object ):
     def __init__(self, space, on_remove=None, kind=0, position=None, mode=MODE_WAIT):
-        self._refcnt_f = utils.g_fruit_cnt
-        self._refcnt_f.inc()
-
         # espece aléatoire si non spécifiée
         assert kind<=nb_fruits(), "type de fruit inconnu"
         if( kind<=0 ):
@@ -165,13 +162,10 @@ class Fruit( object ):
         self._fruit_mode = None
         self._dash_start_time = None
         self._set_mode( mode )
-        #print( f"{self}.__init__()" )
         print( f"{self} created" )
 
 
     def __del__(self):
-        self._refcnt_f.dec()
-        #print( f"__del__({self})")
         assert(    self._body is None 
                and self._shape is None 
                and len(self._sprites)==0
@@ -204,8 +198,9 @@ class Fruit( object ):
             #print( f"{self}.delete()")
             self._space.remove( self._body, self._shape )
             self._body = self._shape = None
-        # should call sprite.delete()
-        self._sprites = {}   
+        for k,sprite in self._sprites.items():
+            sprite.delete()
+        self._sprites = {}
 
 
     @property
@@ -345,6 +340,7 @@ class Fruit( object ):
         self._sprites[SPRITE_EXPLOSION] = explo
         self._sprites[SPRITE_MAIN].fadeout = True
 
+
     def is_offscreen(self) -> bool :
         if self._is_deleted():
             return False
@@ -444,7 +440,6 @@ class ActiveFruits(object):
         """
         # cherche le fruit non explosé le plus ancien
         explosables = [ i for i,f in self._fruits.items() if f._fruit_mode in [MODE_NORMAL, MODE_FIRST_DROP] ]
-        #print( f'reste {len(self._fruits)} fruits actifs dont {len(explosables)} explosables')
         if( explosables ):
             explosables.sort(reverse=True )
             self._fruits[explosables[0]].explose()
@@ -471,9 +466,8 @@ class ActiveFruits(object):
                 print( f"WARNING {f} est sorti du jeu" )
                 f.remove()
 
-        # libere les ressources associées aux fruits retirés du jeu
+        # supprime les références aux fruits REMOVED (pour garbage collection)
         removed = [f.id for f in self._fruits.values() if (all_fruits or f.removed) ]
         for id in removed:
-            self._fruits[id].release_ressources()
             del self._fruits[id]        # should trigger fruit.__del__()
 

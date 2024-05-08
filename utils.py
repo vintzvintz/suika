@@ -61,26 +61,24 @@ class CountDown(object):
         return (t, text)
 
 
-class RessourceCounter(object):
-    """Pour vérifier que toutes les ressources sont bien libérées
-    """
-    def __init__(self, nom):
-        self._cnt = 0
-        self.nom = nom
+# class RessourceCounter(object):
+#     """Pour vérifier que toutes les ressources sont bien libérées
+#     """
+#     def __init__(self, nom):
+#         self._cnt = 0
+#         self.nom = nom
 
-    @property
-    def cnt(self):  return self._cnt
+#     @property
+#     def cnt(self):  return self._cnt
 
-    def __del__(self): print( f"{self}" )
-    def __repr__(self): return( f"{self.nom}={self._cnt}")
-    def inc(self):  self._cnt += 1
-    def dec(self):  self._cnt -=1
+#     def __del__(self): print( f"{self}" )
+#     def __repr__(self): return( f"{self.nom}={self._cnt}")
+#     def inc(self):  self._cnt += 1
+#    def dec(self):  self._cnt -=1
 
+# g_fruit_sprite_cnt = RessourceCounter("FruitSprites")
+# g_preview_sprite_cnt = RessourceCounter("PreviewSprites")
+# g_fruit_cnt = RessourceCounter("Fruit")
 
-
-g_fruit_sprite_cnt = RessourceCounter("FruitSprites")
-g_preview_sprite_cnt = RessourceCounter("PreviewSprites")
-g_fruit_cnt = RessourceCounter("Fruit")
-
-def print_counters():
-    print(f"Fruit={g_fruit_cnt.cnt} FruitsSprite={g_fruit_sprite_cnt.cnt} PreviewSprite={g_preview_sprite_cnt.cnt}")
+# def print_counters():
+#     print(f"Fruit={g_fruit_cnt.cnt} FruitsSprite={g_fruit_sprite_cnt.cnt} PreviewSprite={g_preview_sprite_cnt.cnt}")
