@@ -24,15 +24,24 @@ class BoxElement(object):
     """ forme physique pymunk associée à un objet graphique
     a et b sont les extrémités du segment (en coordonnées du body)
     """
-    def __init__(self, body, a, b, collision_type, thickness ):
+    def __init__(self, body, width, height, collision_type, thickness ):
         self.body = body
-        # objet graphique pyglet
-        l = self.make_sprite(a, b)
-        # objet physique pymunk
-        s = pm.Segment( body, a, b, radius=thickness/2 )
-        s.collision_type = collision_type
-        self.segment, self.line = s, l
+        (a,b) = self.coords(width=width, height=height)
 
+        # objet graphique pyglet
+        self.line = self.make_sprite(a, b)
+        # objet physique pymunk
+        self.segment = pm.Segment( body, a, b, radius=thickness/2 )
+        self.segment.collision_type = collision_type
+
+    def on_resize(self, width, height):
+        (a,b) = self.coords(width=width, height=height)
+        self.line.x, self.line.y = a
+        self.line.x2, self.line.y2 = b
+        self.segment.unsafe_set_endpoints(a, b)
+
+    def coords(self, width, height):
+        raise NotImplementedError("Implementer coords() dans la sous-classe")
 
     def update(self):
         pv1 = self.body.position + self.segment.a.rotated(self.body.angle)
@@ -46,8 +55,9 @@ class BoxElement(object):
     
 
 class Wall( BoxElement ):
-    def __init__(self, body, a, b, collision_type ):
-        super().__init__(body, a, b, thickness=WALL_THICKNESS,
+    def __init__(self, body, width, height, collision_type):
+        super().__init__(body, width, height, 
+                         thickness=WALL_THICKNESS,
                          collision_type=collision_type)
         self.segment.filter= pm.ShapeFilter( categories=CAT_WALLS, 
                                             mask=pm.ShapeFilter.ALL_MASKS() )
@@ -58,16 +68,57 @@ class Wall( BoxElement ):
         return LineSprite.wall( a, b )
 
 
+class WallTop(Wall):
+    def __init__(self, body, width, height):
+        super().__init__(body, width, height, collision_type=COLLISION_TYPE_WALL_BOTTOM )
+
+    def coords(self, width, height):
+        a = (-width/2, height/2)
+        b = (+width/2, height/2)
+        return (a,b)
+
+class WallBottom(Wall):
+    def __init__(self, body, width, height):
+        super().__init__(body, width, height, collision_type=COLLISION_TYPE_WALL_BOTTOM )
+
+    def coords(self, width, height):
+        a = (-width/2, -height/2)
+        b = (+width/2, -height/2)
+        return (a,b)
+
+class WallLeft(Wall):
+    def __init__(self, body, width, height):
+        super().__init__(body, width, height, collision_type=COLLISION_TYPE_WALL_SIDE )
+
+    def coords(self, width, height):
+        a = (-width/2, -height/2)
+        b = (-width/2, +height/2)
+        return (a,b)
+
+class WallRight(Wall):
+    def __init__(self, body, width, height):
+        super().__init__(body, width, height, collision_type=COLLISION_TYPE_WALL_SIDE )
+
+    def coords(self, width, height):
+        a = (+width/2, -height/2)
+        b = (+width/2, +height/2)
+        return (a,b)
+
 
 class MaxLine( BoxElement ):
-    def __init__(self, body, height, length ):
-        a = (-length/2, height)
-        b = (+length/2, height)
-        super().__init__(body, a, b, thickness=3,
+    def __init__(self, body, width, height ):
+        super().__init__(body, width=width, height=height, 
+                         thickness=REDLINE_THICKNESS,
                          collision_type=COLLISION_TYPE_MAXLINE)
         self.segment.filter= pm.ShapeFilter( categories=CAT_MAXLINE, 
                                             mask=pm.ShapeFilter.ALL_MASKS() ^ CAT_WALLS )
         self.segment.sensor = True
+
+    def coords(self, width, height):
+        y = height/2 - BOCAL_MAXLINE_MARGIN
+        a = (-width/2, y)
+        b = (+width/2, y)
+        return (a, b)
 
     def make_sprite(self, a, b):
         return LineSprite.redline( a, b )
@@ -77,25 +128,28 @@ class MaxLine( BoxElement ):
 class DropZone(object):
     """calculs de l'emplacement de lâcher des fruits à l'intérieur du bocal
     """
-    def __init__(self, body, height, length):
+    def __init__(self, body, width, height):
         self._body = body
-        self._left = pm.Vec2d(-length/2, height)
-        self._right = pm.Vec2d(+length/2, height)
+        self.on_resize(width, height)
+
+    def on_resize(self, width, height):
+        y = height/2 - BOCAL_MAXLINE_MARGIN//2
+        self._a = pm.Vec2d(-width/2, y)
+        self._b = pm.Vec2d(+width/2, y)
 
 
     def _drop_point_interpolate(self, r):
         #assert( r >= DROP_MARGIN and r <= 1-DROP_MARGIN ), "tentative de lâcher un fruit hors du bocal"
-        point = self._left + (self._right - self._left) * r
+        point = self._a + (self._b - self._a) * r
         return  self._body.local_to_world( point )
-
 
     def drop_point_from_clic(self, x_clic, margin ):
         """ Renvoie 
         soit le point de lacher d'un fruit en fonction du point cliqué
         soit None si le point est hors du bocal
         """
-        (x_left, y_left) = self._body.local_to_world( self._left )
-        (x_right, y_right) = self._body.local_to_world( self._right )
+        (x_left, y_left) = self._body.local_to_world( self._a )
+        (x_right, y_right) = self._body.local_to_world( self._b )
 
         # position relative sur la dropline
         if( abs(x_right - x_left) > 1.0 ):
@@ -123,17 +177,14 @@ class DropZone(object):
         return self._drop_point_interpolate( margin + (1 - 2*margin) * random.random() )
 
 
-def _make_walls( body, center, width, height):
-    top_right = center + (width/2, height/2)
-    top_left  = center + (-width/2, height/2)
-    bot_right = center + (width/2, -height/2)
-    bot_left  = center + (-width/2, -height/2)
+def _make_walls( body, width, height ):
     return {
-        LEFT:   Wall( body, a=bot_left,  b=top_left,  collision_type=COLLISION_TYPE_WALL_SIDE ), 
-        BOTTOM: Wall( body, a=bot_left,  b=bot_right, collision_type=COLLISION_TYPE_WALL_BOTTOM ), 
-        RIGHT:  Wall( body, a=bot_right, b=top_right, collision_type=COLLISION_TYPE_WALL_SIDE ), 
-        TOP:    Wall( body, a=top_left,  b=top_right, collision_type=COLLISION_TYPE_WALL_BOTTOM ), 
-        MAXLINE: MaxLine( body, length=width, height=height/2-WINDOW_MAXLINE_MARGIN) }
+        LEFT:   WallLeft(body, width, height),
+        BOTTOM: WallBottom(body, width, height),
+        RIGHT:  WallRight(body, width, height), 
+        TOP:    WallTop(body, width, height), 
+        MAXLINE: MaxLine( body, width, height),
+    }
 
 
 class Bocal(object):
@@ -147,13 +198,13 @@ class Bocal(object):
         #b0.angle = math.pi/12
         space.add( b0 )
  
-        self._walls = _make_walls(body=b0, center=pm.Vec2d(0,0), width=width, height=height)
+        self._walls = _make_walls(body=b0, width=width, height=height)
         for w in self._walls.values():
             space.add( w.segment )
         self._space = space
         self._body = b0
         self._maxline = self._walls[MAXLINE]
-        self._dropzone = DropZone(body=b0, height=height/2-100, length=width)
+        self._dropzone = DropZone(body=b0, width=width, height=height)
 
         self._shake = SHAKE_OFF
         self._shake_start_time = None     # t0 pour la secousse automatique
@@ -291,6 +342,14 @@ class Bocal(object):
             xt = min( max(xt, x_ref - SHAKE_AMPLITUDE_X ), x_ref + SHAKE_AMPLITUDE_X)
             yt = min( max(yt, y_ref - SHAKE_AMPLITUDE_Y ), y_ref + SHAKE_AMPLITUDE_Y)
             self._shake_mouse_target = (xt, yt)
+
+
+    def on_resize(self, center, width, height):
+        self._position_ref = center
+        self.shake_stop()  # pour déplacer lentement le body vers la nouvelle position de ref.
+        self._dropzone.on_resize( width, height)
+        for wall in self._walls.values():
+            wall.on_resize(width, height)
 
 
     def drop_point_from_clic(self, x_clic, margin ):

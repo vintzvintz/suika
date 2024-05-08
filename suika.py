@@ -11,12 +11,11 @@ import utils
 from preview import FruitQueue
 import sprites
 
-
 AUTOPLAY_RANDOM ='random'
 
 class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
-        super().__init__(width, height)
+        super().__init__(width=width, height=height, resizable=True)
         self._space = pm.Space( )
         self._space.gravity = (0, -100*GRAVITY)
         self._bocal = Bocal(space=self._space, 
@@ -24,9 +23,9 @@ class SuikaWindow(pg.window.Window):
                             width=width-BOCAL_MARGIN,
                             height=height-BOCAL_MARGIN)
         self._preview = FruitQueue(cnt=PREVIEW_COUNT)
-        self._fruits = ActiveFruits( space=self._space )
+        self._fruits = ActiveFruits( space=self._space, width=width, height=height )
         self._countdown = utils.CountDown()
-        self._labels = gui.Labels( window_width=width, window_height=height )
+        self._gui = gui.GUI( window_width=width, window_height=height )
         self._collision_helper = CollisionHelper(self._space)
         pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
@@ -46,7 +45,7 @@ class SuikaWindow(pg.window.Window):
         self._preview.reset()
         self._fruits.reset()
         self._collision_helper.reset()
-        self._labels.reset()
+        self._gui.reset()
         self._countdown.update( deborde=False )
         self.prepare_next( )
 
@@ -81,7 +80,7 @@ class SuikaWindow(pg.window.Window):
         
         if( self._mouse_drag_x ):
             t = utils.now() - self._left_click_start 
-            if( t > AUTODROP_DELAY ):
+            if( t > AUTOFIRE_DELAY ):
                 self.drop(x=self._mouse_drag_x)
         elif( self._autoplay == AUTOPLAY_RANDOM ):
             self.drop(x=None)
@@ -170,10 +169,10 @@ class SuikaWindow(pg.window.Window):
         if( self._is_paused ):    game_status = "PAUSE"
         if( self._is_gameover ):  game_status = "GAME OVER"
 
-        #self._labels.update( gui.TOP_LEFT, f"drag_x {self._mouse_drag_x}" )
-        self._labels.update( gui.TOP_LEFT, f"score {self._fruits._score}" )
-        self._labels.update( gui.TOP_RIGHT, f"FPS {self.pymunk_fps.value:.0f} / {self.display_fps.value:.0f}" )
-        self._labels.update( gui.TOP_CENTER, game_status )
+        self._gui.update_dict( {
+            gui.TOP_LEFT: f"score {self._fruits._score}",
+            gui.TOP_RIGHT: f"FPS {self.pymunk_fps.value:.0f} / {self.display_fps.value:.0f}",
+            gui.TOP_CENTER: game_status } )
 
 
     def on_draw(self):
@@ -255,6 +254,21 @@ class SuikaWindow(pg.window.Window):
 
     # def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
     #     print(f"on_mouse_scroll(x={x} y={y} scroll_x={scroll_x} scroll_y={scroll_y}")
+
+
+    def on_resize(self, width, height):
+        """ met a jour les dimensions des objets
+        """
+        #print(f'The window was resized to {width}x{height}')
+        self._bocal.on_resize(
+            center=pm.Vec2d(width/2, height/2),
+            width=width-BOCAL_MARGIN,
+            height=height-BOCAL_MARGIN)
+        self._fruits.on_resize(width, height)
+        self._preview.on_resize(width, height)
+        self._gui.on_resize(width, height)
+
+        super().on_resize(width, height)
 
 
 def main():

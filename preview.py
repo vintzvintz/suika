@@ -5,13 +5,13 @@ import fruit
 import utils
 
 class QueueItem(object):
-    def __init__(self, kind, width=PREVIEW_SPRITE_SIZE ):
+    def __init__(self, kind, sprite_size ):
         self.kind = kind
-        self._sprite = PreviewSprite( nom=fruit.name_from_kind(kind), width=width )
+        self._sprite = PreviewSprite( nom=fruit.name_from_kind(kind), width=sprite_size )
+        self.y_pos = 0
 
-    def update(self, slot):
+    def update(self, slot, y):
         x = PREVIEW_SLOT_SIZE * (slot + 0.5)
-        y = PREVIEW_Y_POS
         self._sprite.position = (x,y,0)
         self._sprite.update(x, y)
 
@@ -19,6 +19,7 @@ class QueueItem(object):
 class FruitQueue( object ):
     def __init__( self, cnt):
         self._cnt = cnt
+        self.y_pos = 0
         self.reset()
 
     def reset(self):
@@ -28,8 +29,11 @@ class FruitQueue( object ):
         self._shift_end_time = None
         self.update()
 
+    def on_resize(self, width, height):
+        self.y_pos = height - PREVIEW_Y_POS
+
     def _add_item(self):
-        s = QueueItem( kind = fruit.random_kind(), width=PREVIEW_SPRITE_SIZE )
+        s = QueueItem( kind = fruit.random_kind(), sprite_size=PREVIEW_SPRITE_SIZE )
         self._queue.insert(0, s)
 
     def get_next_fruit(self):
@@ -56,5 +60,4 @@ class FruitQueue( object ):
             offset = 0
         
         for idx, item in enumerate(self._queue):
-            item.update(idx + offset)
-
+            item.update(slot=(idx + offset), y=self.y_pos)

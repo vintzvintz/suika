@@ -120,11 +120,10 @@ class SuikaSprite ( pg.sprite.Sprite ):
 
     # intercepte l'update du pyglet.spite.Sprite pour traiter les animations
     def update(self, x, y, rotation, on_animation_stop):
-
-        # position
+        # position traitée par pyglet
         pg.sprite.Sprite.update( self, x=x, y=y, rotation=rotation )
 
-        # gestion des effets animés
+        # gestion des animations 
         coef_size = 1.0
         coef_opacity = 1.0
 
@@ -140,7 +139,7 @@ class SuikaSprite ( pg.sprite.Sprite ):
             coef_size = min( FADEIN_OVERSHOOT, a )
             coef_opacity = min (1, a)
 
-        # effet fadeout
+        # fadeout
         if( self._fadeout_start ):
             assert( not self.fadein )
             t = utils.now() - self._fadeout_start
@@ -181,6 +180,8 @@ class FruitSprite( SuikaSprite ):
 
 
 class PreviewSprite( FruitSprite ):
+    """ fruits en attente (non associé à un objet pymunk)
+    """
     def __init__(self, nom, width=PREVIEW_SPRITE_SIZE, refcnt=None ):
         super().__init__(nom, r=width/2, group=sprite_group(SPRITE_GROUP_GUI) )
 
@@ -189,8 +190,10 @@ class PreviewSprite( FruitSprite ):
 
 
 ## Explosion
-
-ligne1 = [ 
+EXPLO_SIZE = 256
+EXPLO_PNG = "explosion.png"
+EXPLO_CENTRES = [ 
+    # ligne1
     (206,625),
     (437,625),
     (665,625),
@@ -198,8 +201,7 @@ ligne1 = [
     (1151,625),
     (1435,625),
     (1712,625),
-]
-ligne2 = [
+    #ligne2 
     (205,275),
     (456,275),
     (708,275),
@@ -208,10 +210,6 @@ ligne2 = [
     (1456,275),
     (1712,275),
 ]
-
-EXPLO_CENTRES = ligne1+ligne2
-EXPLO_SIZE = 256
-EXPLO_PNG = "explosion.png"
 
 
 def _make_sequence():
@@ -227,7 +225,9 @@ def _make_sequence():
         sequence=seq, 
         loop=False,
         duration=EXPLOSION_DELAY / len(seq))
-    
+
+
+# variable globale pour éviter de re-creer la séquence à chaque explosion.
 _sequence_explosion = _make_sequence()
 
 class ExplosionSprite( SuikaSprite ):
@@ -235,17 +235,13 @@ class ExplosionSprite( SuikaSprite ):
         # setup callback
         self._on_explosion_end = on_explosion_end
         # build actual sprite
-        self._make_animated_sprite(r)
-        scale = 2.5 * r / EXPLO_SIZE
-        self._scale_ref = ( scale, scale )
-
-
-    def _make_animated_sprite(self, r):
         super().__init__(img=_sequence_explosion,
                          batch = batch(),
                          group=sprite_group(SPRITE_GROUP_EXPLOSIONS))
-        self.opacity=128
 
+        scale = 2.5 * r / EXPLO_SIZE
+        self._scale_ref = ( scale, scale )
+        self.opacity=128
 
     # Event envoyé par pyglet automatiquement
     def on_animation_end(self):

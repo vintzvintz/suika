@@ -130,18 +130,13 @@ class AnimatedCircle( pm.Circle ):
 
 
 class Fruit( object ):
-    def __init__(self, space, on_remove=None, kind=0, position=None, mode=MODE_WAIT):
+    def __init__(self, space, position, on_remove=None, kind=0, mode=MODE_WAIT):
         # espece aléatoire si non spécifiée
         assert kind<=nb_fruits(), "type de fruit inconnu"
+        assert position
         if( kind<=0 ):
             kind = random_kind()
         fruit_def = _FRUITS_DEF[kind]
-
-        # position par défaut
-        if( not position ):
-            x = WINDOW_WIDTH//2
-            y = WINDOW_HEIGHT-WINDOW_MAXLINE_MARGIN +  fruit_def['radius'] + 5
-            position = pm.Vec2d(x,y)
 
         self._id = _get_new_id()
         self._kind = kind
@@ -201,6 +196,16 @@ class Fruit( object ):
         for k,sprite in self._sprites.items():
             sprite.delete()
         self._sprites = {}
+
+    # sert uniquement à deplacer le fruit en attente (next_fruit)
+    def on_window_resize(self, width, height):
+        if(self._fruit_mode != MODE_WAIT):
+            print(f"{self} WARNING on_resize() ignoré en mode {self._fruit_mode}")
+            return
+        fruit_def = _FRUITS_DEF[self._kind]
+        x = width//2
+        y = height - fruit_def['radius'] - 5
+        self.position = pm.Vec2d(x,y)
 
 
     @property
@@ -359,11 +364,12 @@ class Fruit( object ):
 
 class ActiveFruits(object):
 
-    def __init__(self, space):
+    def __init__(self, space, width, height):
         self._space = space
         self._fruits = dict()
         self._score = 0
         self._next_fruit = None
+        self._window_size = ( width, height )
         self._is_gameover = False
 
     def __len__(self):
@@ -389,7 +395,10 @@ class ActiveFruits(object):
         if( self._next_fruit ):
             print("next_fruit deja present")
             return
-        self._next_fruit = Fruit(space=self._space, kind=kind, on_remove=self.on_remove)
+        self._next_fruit = Fruit(space=self._space,
+                                 kind=kind, 
+                                 position=self._next_position(),
+                                 on_remove=self.on_remove)
         # self.add() appelé dans play_next()
 
     def drop_next(self, position):
@@ -471,3 +480,12 @@ class ActiveFruits(object):
         for id in removed:
             del self._fruits[id]        # should trigger fruit.__del__()
 
+
+    def _next_position(self):
+        return ( self._window_size[0] // 2, 
+                 self._window_size[1] - NEXT_FRUIT_Y_POS )
+
+    def on_resize(self, width, height):
+        self._window_size = (width, height)
+        if( self._next_fruit ):
+            self._next_fruit.position = self._next_position()
