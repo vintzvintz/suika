@@ -130,7 +130,7 @@ class AnimatedCircle( pm.Circle ):
 
 
 class Fruit( object ):
-    def __init__(self, space, on_remove=None, kind=0, position=None, mode=MODE_WAIT, refcnt=None):
+    def __init__(self, space, on_remove=None, kind=0, position=None, mode=MODE_WAIT):
         self._refcnt_f = utils.g_fruit_cnt
         self._refcnt_f.inc()
 

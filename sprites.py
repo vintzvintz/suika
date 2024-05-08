@@ -27,9 +27,6 @@ def batch():            return _g_batch
 def groupe_gui():       return _groups[SPRITE_GROUP_GUI]
 def groupe_masque():    return _groups[SPRITE_GROUP_MASQUE]
 
-g_fruit_sprite_cnt = utils.RessourceCounter("FruitSprites")
-g_preview_sprite_cnt = utils.RessourceCounter("PreviewSprites")
-
 _g_batch = pg.graphics.Batch()   # optimisation pour l'affichage
 
 
