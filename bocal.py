@@ -123,20 +123,17 @@ class DropZone(object):
         return self._drop_point_interpolate( margin + (1 - 2*margin) * random.random() )
 
 
-
 def _make_walls( body, center, width, height):
-
     top_right = center + (width/2, height/2)
     top_left  = center + (-width/2, height/2)
     bot_right = center + (width/2, -height/2)
     bot_left  = center + (-width/2, -height/2)
-
-    left = Wall( body, a=bot_left, b=top_left, collision_type=COLLISION_TYPE_WALL_SIDE )
-    bottom = Wall( body, a=bot_left, b=bot_right, collision_type=COLLISION_TYPE_WALL_BOTTOM )
-    right = Wall( body, a=bot_right, b=top_right, collision_type=COLLISION_TYPE_WALL_SIDE )
-    top = Wall( body, a=top_left, b=top_right, collision_type=COLLISION_TYPE_WALL_BOTTOM )
-    maxline = MaxLine( body, length=width, height=height/2-WINDOW_MAXLINE_MARGIN)
-    return {LEFT: left, BOTTOM: bottom, RIGHT: right, TOP: top, MAXLINE: maxline }
+    return {
+        LEFT:   Wall( body, a=bot_left,  b=top_left,  collision_type=COLLISION_TYPE_WALL_SIDE ), 
+        BOTTOM: Wall( body, a=bot_left,  b=bot_right, collision_type=COLLISION_TYPE_WALL_BOTTOM ), 
+        RIGHT:  Wall( body, a=bot_right, b=top_right, collision_type=COLLISION_TYPE_WALL_SIDE ), 
+        TOP:    Wall( body, a=top_left,  b=top_right, collision_type=COLLISION_TYPE_WALL_BOTTOM ), 
+        MAXLINE: MaxLine( body, length=width, height=height/2-WINDOW_MAXLINE_MARGIN) }
 
 
 class Bocal(object):
