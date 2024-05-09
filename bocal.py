@@ -288,8 +288,8 @@ class Bocal(object):
             freq = min(
                 SHAKE_FREQ_MAX, 
                 (SHAKE_FREQ_MIN + t/SHAKE_ACCEL_DELAY * (SHAKE_FREQ_MAX-SHAKE_FREQ_MIN)))
-            #print(f"shake freq={freq}Hz  t={t}s")
             p  =  ( x_ref + SHAKE_AMPLITUDE_X * math.sin( 2 * math.pi * freq * t), y_ref ) 
+            #print(f"shake postion={math.sin( 2 * math.pi * freq * t):0.2f} freq={freq}Hz  t={t}s")
             # vitesse pour atteindre la position au prochain step
             velocity = (p - self._body.position)/dt
 
