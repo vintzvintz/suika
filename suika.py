@@ -24,10 +24,11 @@ class SuikaWindow(pg.window.Window):
         self._countdown = utils.CountDown()
         self._gui = gui.GUI( window_width=width, window_height=height )
         self._collision_helper = CollisionHelper(self._space)
+        #pg.clock.schedule( self.simulation_step )
         pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
-        self.display_fps = utils.Speedmeter()
-        self.pymunk_fps = utils.Speedmeter()
+        self.display_fps = utils.Speedmeter()        
+        self.pymunk_fps = utils.Speedmeter(bufsize=500)
 
         self.set_caption("Pastèque")
         self.set_minimum_size( width = 2 * BOCAL_MARGIN_SIDE + BOCAL_MIN_WIDTH,
@@ -39,6 +40,7 @@ class SuikaWindow(pg.window.Window):
         self._is_paused = False
         self._autoplay = None
         self._is_mouse_shake = False
+        self._is_benchmark_mode = False
         self._left_click_start = None
         self._mouse_drag_x = None
         self._bocal.reset()
@@ -49,6 +51,14 @@ class SuikaWindow(pg.window.Window):
         self._countdown.update( deborde=False )
         self.prepare_next( )
 
+
+    def toggle_benchmark_mode( self ):
+        pg.clock.unschedule( self.simulation_step )
+        self._is_benchmark_mode = not self._is_benchmark_mode
+        if( self._is_benchmark_mode ):
+            pg.clock.schedule( self.simulation_step )
+        else:
+            pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
 
     def prepare_next(self):
         kind = self._preview.get_next_fruit()
@@ -138,13 +148,19 @@ class SuikaWindow(pg.window.Window):
         self.pymunk_fps.tick_rel(dt)
         if( self._is_paused ):
             return
-        
+
+        fps = self.pymunk_fps.value
+        if( fps>0 ):
+            dt = 1.0 / fps
+
         # met à jour la position des éléments du bocal
         self._bocal.step(dt)
         # prepare le gestionnaire de collisions
         self._collision_helper.reset()
         # execute 1 pas de simulation physique
-        self._space.step( PYMUNK_INTERVAL )  
+        #self._space.step( PYMUNK_INTERVAL )  
+        self._space.step( dt )  
+
         # modifie les fruits selon les collisions détectées
         self._collision_helper.process( 
             spawn_func=self.spawn_in_bocal, 
@@ -226,6 +242,8 @@ class SuikaWindow(pg.window.Window):
             self.toggle_pause()
         elif(symbol == pg.window.key.G):        # G force un gameover en cours de partie
             self.gameover()
+        elif(symbol == pg.window.key.B):        # Mode benchmark
+            self.toggle_benchmark_mode()
         else:
             return pg.event.EVENT_UNHANDLED
         return pg.event.EVENT_HANDLED

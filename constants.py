@@ -23,8 +23,8 @@ BOCAL_MIN_WIDTH=300
 BOCAL_MIN_HEIGHT=400
 
 ############ Simulation physique #############
-PYMUNK_INTERVAL = 1 / 180.0     # physics engine steps per sec.
-FRICTION = 0.30
+PYMUNK_INTERVAL = 1 / 180.0     # cadence simulation physique
+FRICTION = 0.80
 GRAVITY = -981
 INITIAL_VELOCITY = 1200
 ELASTICITY_FRUIT = 0.35
