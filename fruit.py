@@ -10,7 +10,7 @@ from sprites import VISI_NORMAL, VISI_HIDDEN
 from sprites import FruitSprite, ExplosionSprite
 
 
-_FRUITS_DEF = [
+_FRUITS_DEF_ORIGINAL = [
     # le rang dans cette liste sert de kind/points/collision_type;
     # valeur 0 réservée aux types sans handlers.
     None,       
@@ -26,6 +26,27 @@ _FRUITS_DEF = [
     {'mass':40, 'radius':230, 'name':'melon' },
     {'mass':50, 'radius':200, 'name':'pasteque' },
 ]
+
+
+def mode_mini(fruits):
+    ret = [None]
+    for f in fruits[1:]:
+        fruit_mini = {}
+        for k,v in f.items():
+            if( k=='radius' ):
+                fruit_mini[k] = v/5
+            else:
+                fruit_mini[k] = v
+        ret.append( fruit_mini)
+    return ret
+
+
+
+#_FRUITS_DEF = _FRUITS_DEF_ORIGINAL
+_FRUITS_DEF = mode_mini( _FRUITS_DEF_ORIGINAL )
+
+
+
 
 _FRUITS_RANDOM = [ 1,2,3,4 ]
 
