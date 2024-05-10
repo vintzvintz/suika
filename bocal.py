@@ -20,7 +20,7 @@ TUMBLE_OFF='off'
 TUMBLE_ONCE='once'
 
 
-WALLS_DAMPING = 3     # 1 = no damping, 2 = timestep/2, etc...
+WALLS_DAMPING = 10     # 1 = no damping, 2 = timestep/2, etc...
 
 class BoxElement(object):
     """ forme physique pymunk associée à un objet graphique
@@ -69,17 +69,20 @@ class BoxElement(object):
 
 
     def move_to(self, position, angle, dt):
-        """ modifie la vitesse du mour pour le placer à la position requise
+        """ modifie la vitesse du body pour le placer à la position requise
         """
         # angle est l'angle du body dans la simulation physique
         # ne pas confondre avec self._local_angle
-        d_angle = (angle - self.body.angle) % (2*math.pi)
         d_pos = position - self.body.position
+        d_angle = (angle - self.body.angle) % (2*math.pi)
 
-        # TODO: arreter l'ajustement en dessous d'un certain seuil
-        self.body.velocity = d_pos / (dt * WALLS_DAMPING)
-        self.body.angular_velocity = d_angle / (dt * WALLS_DAMPING)
-
+        self.body.velocity = pm.Vec2d(0,0)
+        self.body.angular_velocity = 0
+        if( (dt > 0.000001) ):
+            if( d_pos.length > 0.000001 ):
+                self.body.velocity = d_pos / (dt * WALLS_DAMPING)
+            if( d_angle > 0.000001 ):
+                self.body.angular_velocity = d_angle / (dt * WALLS_DAMPING)
 
     def update(self):
         """ met a jour l'objet graphique à partir de la simulation physique
@@ -376,8 +379,11 @@ class Bocal(object):
 
         # retour amorti à la position de reference
         elif( self._shake == SHAKE_STOPPING ):
-            dist = self._position_ref - self._body.position 
-            velocity =  SHAKE_RETURN_SPEED * dist / dt
+            dist = self._position_ref - self._body.position
+            if(dt > 0.000001 and dist.length>0.000001):
+                velocity =  SHAKE_RETURN_SPEED * dist / dt
+            else:
+                velocity = pm.Vec2d(0, 0)
 
             # condition d'arret de l'amorti
             dist_from_position_ref = (self._body.position - self._position_ref)
