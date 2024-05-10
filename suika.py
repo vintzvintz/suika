@@ -17,11 +17,8 @@ class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
         super().__init__(width=width, height=height, resizable=True)
         self._space = pm.Space( )
-        self._space.gravity = (0, -100*GRAVITY)
-        self._bocal = Bocal(space=self._space, 
-                            center=pm.Vec2d(width/2, height/2),
-                            width=width-BOCAL_MARGIN,
-                            height=height-BOCAL_MARGIN)
+        self._space.gravity = (0, GRAVITY)
+        self._bocal = Bocal(space=self._space, **utils.bocal_coords( window_w=width, window_h=height) )
         self._preview = FruitQueue(cnt=PREVIEW_COUNT)
         self._fruits = ActiveFruits( space=self._space, width=width, height=height )
         self._countdown = utils.CountDown()
@@ -32,7 +29,6 @@ class SuikaWindow(pg.window.Window):
         self.display_fps = utils.Speedmeter()
         self.pymunk_fps = utils.Speedmeter()
         self.reset_game()
-
 
     def reset_game(self):
         self._is_gameover = False
@@ -139,19 +135,21 @@ class SuikaWindow(pg.window.Window):
         if( self._is_paused ):
             return
         
-        # secoue le bocal
-        self._bocal.update_walls(dt)
+        # met à jour la position des éléments du bocal
+        self._bocal.step(dt)
         # prepare le gestionnaire de collisions
         self._collision_helper.reset()
         # execute 1 pas de simulation physique
         self._space.step( PYMUNK_INTERVAL )  
         # modifie les fruits selon les collisions détectées
-        self._collision_helper.process( spawn_func=self.spawn_in_bocal, world_to_bocal_func=self._bocal.to_bocal )
+        self._collision_helper.process( 
+            spawn_func=self.spawn_in_bocal, 
+            world_to_bocal_func=self._bocal.to_bocal )
         # menage 
         self._fruits.cleanup()
 
 
-    def update_gui(self):
+    def update(self):
         # gere le countdown en cas de débordement
         if( not self._bocal.is_tumbling):
             ids = self._bocal.fruits_sur_maxline()
@@ -175,12 +173,24 @@ class SuikaWindow(pg.window.Window):
             gui.TOP_CENTER: game_status } )
 
 
+    def end_application(self):
+        # self._bocal.delete()
+        # self._preview.delete()
+        # self._fruits.delete()
+        # self._countdown.delete()
+        # self._gui.delete()
+        # self._collision_helper.delete()
+        # self.display_fps.delete()
+        # self.pymunk_fps.delete()
+        self.close()
+
+
     def on_draw(self):
 
         # met a jour les positions des fruits et les widgets du GUI
         self._fruits.update()
         self._preview.update()
-        self._bocal.update_sprites()
+        self._bocal.update()
         self.update_gui()
 
         # met à jour l'affichage
@@ -195,7 +205,7 @@ class SuikaWindow(pg.window.Window):
             utils.print_counters()
 
         if(symbol == pg.window.key.ESCAPE):        # ESC ferme le jeu dans tous les cas
-            self.close()
+            self.end_application()
         elif(self._is_gameover or symbol==pg.window.key.R):    # n'importe quelle touche relance une partie apres un gameover
             self.reset_game()
         elif(symbol == pg.window.key.A):           # A controle l'autoplay
@@ -260,16 +270,13 @@ class SuikaWindow(pg.window.Window):
         """ met a jour les dimensions des objets
         """
         #print(f'The window was resized to {width}x{height}')
-        self._bocal.on_resize(
-            center=pm.Vec2d(width/2, height/2),
-            width=width-BOCAL_MARGIN,
-            height=height-BOCAL_MARGIN)
+        self._bocal.on_resize( **utils.bocal_coords( window_w=width, window_h=height ) )
         self._fruits.on_resize(width, height)
         self._preview.on_resize(width, height)
         self._gui.on_resize(width, height)
 
+        # nécessaire pour mettre à jour l'affichage
         super().on_resize(width, height)
-
 
 def main():
     pg.resource.path = ['assets/']

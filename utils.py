@@ -1,9 +1,11 @@
 
 import time
 import collections
-import pyglet as pg
-from constants import *
 
+import pyglet as pg
+import pymunk as pm
+
+from constants import *
 
 def now():
     return pg.clock.get_default().time()
@@ -82,3 +84,12 @@ class CountDown(object):
 
 # def print_counters():
 #     print(f"Fruit={g_fruit_cnt.cnt} FruitsSprite={g_fruit_sprite_cnt.cnt} PreviewSprite={g_preview_sprite_cnt.cnt}")
+
+
+def bocal_coords(window_w, window_h ):
+    return {
+        'center':  pm.Vec2d(window_w/2, window_h/2),
+        'bocal_w': window_w-BOCAL_MARGIN,
+        'bocal_h': window_h-BOCAL_MARGIN
+    }
+
