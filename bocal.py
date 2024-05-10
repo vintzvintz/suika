@@ -20,7 +20,7 @@ TUMBLE_OFF='off'
 TUMBLE_ONCE='once'
 
 
-WALLS_DAMPING = 2     # 1 = no damping, 2 = timestep/2, etc...
+WALLS_DAMPING = 3     # 1 = no damping, 2 = timestep/2, etc...
 
 class BoxElement(object):
     """ forme physique pymunk associée à un objet graphique
@@ -111,8 +111,6 @@ class BoxElement(object):
     
 
 class Wall( BoxElement ):
-
-
     def __init__(self, bocal_w, bocal_h, collision_type):
         super().__init__( bocal_w=bocal_w, 
                           bocal_h=bocal_h,
@@ -140,15 +138,6 @@ class HorizontalWall(Wall):
         local_angle = 0
         return (length, local_angle)
     
-class BottomWall(HorizontalWall):
-    def bocal_position_func(self,w,h):
-        return (0, -h/2)
-
-class TopWall(HorizontalWall):
-    def bocal_position_func(self,w,h):
-        return (0, +h/2)
-
-
 class VerticalWall(Wall):
     def __init__(self, bocal_w, bocal_h):
         super().__init__( bocal_w=bocal_w, 
@@ -161,6 +150,15 @@ class VerticalWall(Wall):
         length = bocal_h
         local_angle = math.pi / 2
         return (length, local_angle)
+    
+
+class BottomWall(HorizontalWall):
+    def bocal_position_func(self,w,h):
+        return (0, -h/2)
+
+class TopWall(HorizontalWall):
+    def bocal_position_func(self,w,h):
+        return (0, +h/2)
 
 class LeftWall(VerticalWall):
     def bocal_position_func(self, w, h):
