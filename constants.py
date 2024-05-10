@@ -1,11 +1,13 @@
 
 ############ Apparence de l'application #############
 WINDOW_HEIGHT = 1800
-WINDOW_WIDTH  = 1500
-BOCAL_MARGIN = 500
+WINDOW_WIDTH  = 1400
+BOCAL_MARGIN_TOP = 200
+BOCAL_MARGIN_BOTTOM = 50
+BOCAL_MARGIN_SIDE = 150
 GUI_FONT_SIZE = 25
 GUI_TOP_MARGIN = 10
-NEXT_FRUIT_Y_POS = 160   # pixels from top
+NEXT_FRUIT_Y_POS = BOCAL_MARGIN_TOP//2   # pixels from top
 PREVIEW_Y_POS =  90    # pixels from top
 PREVIEW_SPRITE_SIZE = 50
 PREVIEW_SLOT_SIZE = 70
@@ -17,7 +19,8 @@ WALL_COLOR = (205,200,255,255)
 REDLINE_TOP_MARGIN = 170
 REDLINE_THICKNESS = 2
 REDLINE_COLOR= (255,20,20,255) 
-
+BOCAL_MIN_WIDTH=300
+BOCAL_MIN_HEIGHT=400
 
 ############ Simulation physique #############
 PYMUNK_INTERVAL = 1 / 180.0     # physics engine steps per sec.

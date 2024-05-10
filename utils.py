@@ -87,9 +87,13 @@ class CountDown(object):
 
 
 def bocal_coords(window_w, window_h ):
-    return {
-        'center':  pm.Vec2d(window_w/2, window_h/2),
-        'bocal_w': window_w-BOCAL_MARGIN,
-        'bocal_h': window_h-BOCAL_MARGIN
-    }
+    margin_left = BOCAL_MARGIN_SIDE
+    margin_right = BOCAL_MARGIN_SIDE
+    margin_top = BOCAL_MARGIN_TOP
+    margin_bottom = BOCAL_MARGIN_BOTTOM
+    bocal_w = window_w - margin_left - margin_right
+    bocal_h = window_h - margin_top - margin_bottom
+    center = ( margin_left + bocal_w/2, margin_bottom + bocal_h/2 )
+    return { 'center':center, 'bocal_w':bocal_w, 'bocal_h':bocal_h }
+
 

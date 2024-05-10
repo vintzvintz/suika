@@ -15,7 +15,7 @@ AUTOPLAY_RANDOM ='random'
 
 class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
-        super().__init__(width=width, height=height, resizable=True)
+        super().__init__(width=width, height=height, resizable=True, )
         self._space = pm.Space( )
         self._space.gravity = (0, GRAVITY)
         self._bocal = Bocal(space=self._space, **utils.bocal_coords( window_w=width, window_h=height) )
@@ -28,6 +28,10 @@ class SuikaWindow(pg.window.Window):
         pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
         self.display_fps = utils.Speedmeter()
         self.pymunk_fps = utils.Speedmeter()
+
+        self.set_caption("Pastèque")
+        self.set_minimum_size( width = 2 * BOCAL_MARGIN_SIDE + BOCAL_MIN_WIDTH,
+                               height = BOCAL_MARGIN_TOP + BOCAL_MARGIN_BOTTOM + BOCAL_MIN_HEIGHT )
         self.reset_game()
 
     def reset_game(self):
