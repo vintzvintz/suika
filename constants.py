@@ -33,6 +33,8 @@ ELASTICITY_WALLS = 0.35
 
 ############ Animations et temporisations du jeu #############
 AUTOPLAY_INTERVAL = 250 / WINDOW_WIDTH 
+AUTOPLAY_INTERVAL_BASE = 100 
+
 PREVIEW_SHIFT_DELAY = 0.95 * AUTOPLAY_INTERVAL  # seconds
 AUTOFIRE_DELAY = 0.5   # secondes 
 SHAKE_FREQ_MIN = 1.5       # Hz

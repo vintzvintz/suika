@@ -1,4 +1,5 @@
 
+import math
 import pyglet as pg
 import pymunk as pm
 
@@ -11,7 +12,7 @@ import utils
 from preview import FruitQueue
 import sprites
 
-AUTOPLAY_RANDOM ='random'
+AUTOPLAY_ON ='on'
 
 class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
@@ -26,7 +27,7 @@ class SuikaWindow(pg.window.Window):
         self._collision_helper = CollisionHelper(self._space)
         #pg.clock.schedule( self.simulation_step )
         pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
-        pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL)
+        #pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL_BASE)
         self.display_fps = utils.Speedmeter()        
         self.pymunk_fps = utils.Speedmeter(bufsize=500)
 
@@ -38,7 +39,10 @@ class SuikaWindow(pg.window.Window):
     def reset_game(self):
         self._is_gameover = False
         self._is_paused = False
-        self._autoplay = None
+        self._autoplay_on = False
+        self._autofire_on = False
+        self._autoplay_level = 0
+        self._autoplay_txt = ""
         self._is_mouse_shake = False
         self._is_benchmark_mode = False
         self._left_click_start = None
@@ -59,6 +63,25 @@ class SuikaWindow(pg.window.Window):
             pg.clock.schedule( self.simulation_step )
         else:
             pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
+
+
+    def adjust_autoplay_level(self, adj):
+        """ Niveau de l'autoplay, en relatif par rapport à BASE_INTERVAL
+        """
+        self._autoplay_level = min( max( 0, self._autoplay_level + adj ), 100 )
+        pg.clock.unschedule( self.autoplay )
+        interval = self._autoplay_interval()
+        print(f"autoplay interval = {interval}")
+        if( interval ):
+            pg.clock.schedule_interval( self.autoplay, interval=interval )
+
+
+    def _autoplay_interval(self):
+        #TODO: logarithmique
+        if( self._autoplay_level <= 0 ):
+            return None
+        return AUTOPLAY_INTERVAL_BASE / math.exp(self._autoplay_level)
+
 
     def prepare_next(self):
         kind = self._preview.get_next_fruit()
@@ -85,15 +108,24 @@ class SuikaWindow(pg.window.Window):
 
 
     def autoplay(self, dt):
+        msg = []
         if( self._is_paused or self._is_gameover ):
-            return
-        
-        if( self._mouse_drag_x ):
+            #self._autoplay_txt = ""
+            pass
+        elif( self._mouse_drag_x ):
             t = utils.now() - self._left_click_start 
             if( t > AUTOFIRE_DELAY ):
                 self.drop(x=self._mouse_drag_x)
-        elif( self._autoplay == AUTOPLAY_RANDOM ):
+                self._autofire_on = True
+                msg.append("AUTOFIRE (clic to disengage)")
+        elif( self._autoplay_on ):
             self.drop(x=None)
+            msg.append("AUTOPLAY")
+        else:
+            pass
+            #self._autoplay_txt = ""
+
+        self._autoplay_txt = ' '.join(msg)
 
 
     def gameover(self):
@@ -107,10 +139,7 @@ class SuikaWindow(pg.window.Window):
 
     def toggle_autoplay(self):
         assert( not self._is_gameover )
-        if( not self._autoplay ):
-            self._autoplay = AUTOPLAY_RANDOM
-        elif( self._autoplay == AUTOPLAY_RANDOM):
-            self._autoplay = None
+        self._autoplay_on = not self._autoplay_on
 
 
     def toggle_pause(self):
@@ -182,13 +211,14 @@ class SuikaWindow(pg.window.Window):
 
         # l'ordre des conditions définit la priorité des messages
         game_status = ""
-        if( self._autoplay ):     game_status = "AUTOPLAY"
+        if( True ):               game_status = self._autoplay_txt
         if( countdown_txt ):      game_status = countdown_txt
         if( self._is_paused ):    game_status = "PAUSE"
         if( self._is_gameover ):  game_status = "GAME OVER"
 
         self._gui.update_dict( {
-            gui.TOP_LEFT: f"score {self._fruits._score}",
+            gui.TOP_LEFT: f"Fruits {len(self._fruits._fruits)}",
+           # gui.TOP_LEFT: f"score {self._fruits._score}",
             gui.TOP_RIGHT: f"FPS {self.pymunk_fps.value:.0f} / {self.display_fps.value:.0f}",
             gui.TOP_CENTER: game_status } )
 
@@ -257,8 +287,9 @@ class SuikaWindow(pg.window.Window):
             self._bocal.shake_stop()
 
     def on_mouse_press(self, x, y, button, modifiers):
-        # relance une partie si la précédente est terminée
+        self._autofire_on = False
         if( self._is_gameover ):
+            # relance une partie si la précédente est terminée
             self.reset_game()
         elif( (button & pg.window.mouse.LEFT) ):
             self._left_click_start = utils.now()
@@ -269,10 +300,11 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_mouse_release(self, x, y, button, modifiers):
-        # relance une partie si la précédente est terminée
+
         if( (button & pg.window.mouse.LEFT) ):
-            self._left_click_start = None
-            self._mouse_drag_x = None
+            if( not self._autofire_on ):
+                self._left_click_start = None
+                self._mouse_drag_x = None
 
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
@@ -281,11 +313,14 @@ class SuikaWindow(pg.window.Window):
             self._mouse_drag_x = x
 
 
-    # def on_mouse_motion(self, x, y, dx, dy):
-    #     print( f"on_mouse_motion(x={x}, y={y}, dx={dx} dy={dy})")
+    def on_mouse_motion(self, x, y, dx, dy):
+        if( self._autofire_on ):
+            self.on_mouse_drag(x, y, dx, dy, pg.window.mouse.LEFT, None )
+            print( f"on_mouse_motion(x={x}, y={y}, dx={dx} dy={dy})")
 
-    # def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
-    #     print(f"on_mouse_scroll(x={x} y={y} scroll_x={scroll_x} scroll_y={scroll_y}")
+    def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
+        print(f"on_mouse_scroll(x={x} y={y} scroll_x={scroll_x} scroll_y={scroll_y}    => lvl={self._autoplay_level}")
+        self.adjust_autoplay_level(scroll_y)
 
 
     def on_resize(self, width, height):

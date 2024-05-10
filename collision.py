@@ -137,7 +137,7 @@ class CollisionHelper(object):
             f0 = explose_fruits[0]
             f1 = explose_fruits[1]
             assert( f0.kind == f1.kind )
-            print( f"Fusion {[f0, f1]}" )
+#            print( f"Fusion {[f0, f1]}" )
             self._actions.append( f0.explose )
             self._actions.append( lambda : f1.merge_to( dest=f0.position ) )
 

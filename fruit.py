@@ -178,7 +178,7 @@ class Fruit( object ):
         self._fruit_mode = None
         self._dash_start_time = None
         self._set_mode( mode )
-        print( f"{self} created" )
+        #print( f"{self} created" )
 
 
     def __del__(self):
