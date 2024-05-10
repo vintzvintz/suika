@@ -10,28 +10,36 @@ from constants import *
 def now():
     return pg.clock.get_default().time()
 
+DEFAULT_BUFSIZE = 200
+SPEEDMETER_UPDATE_RATE = 0.2   #  seconds
 
-SPEEDMETER_BUFSIZE = 200
 class Speedmeter(object):
-    def __init__(self):
-        self._history = collections.deque( [0] * SPEEDMETER_BUFSIZE, maxlen=SPEEDMETER_BUFSIZE )
-        self.value = 0.0
-        self._ticks = 0
+    def __init__(self, bufsize=DEFAULT_BUFSIZE ):
+        self._deltas = collections.deque( maxlen=bufsize )
+        self._value = 0.0
         self._last_tick = None
+        self._last_refresh = 0
 
     def tick_rel(self, dt):
-        self._ticks += 1
-        self._history.append(dt)
-        # self._history.pop()    # inutile avec maxlen
-        if( (self._ticks % 20)==0 ):
-            self.value = len(self._history) / sum(self._history)
+        self._deltas.append(dt)
 
     def tick(self):
         current = time.perf_counter()
         if( self._last_tick ):
             last = self._last_tick
-            self.tick_rel( current-last )
+            self._deltas.append( current-last )
         self._last_tick = current
+
+    @property
+    def value(self):
+        if( len(self._deltas) == 0 ):
+            return 0
+        if( now() - self._last_refresh >= SPEEDMETER_UPDATE_RATE ):
+            s = sum(self._deltas)
+            if( s>0 ):
+                self._value = len(self._deltas) / s
+                self._last_refresh = now()
+        return self._value
 
 
 class CountDown(object):
