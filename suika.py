@@ -191,7 +191,7 @@ class SuikaWindow(pg.window.Window):
         self._fruits.update()
         self._preview.update()
         self._bocal.update()
-        self.update_gui()
+        self.update()
 
         # met à jour l'affichage
         self.clear()

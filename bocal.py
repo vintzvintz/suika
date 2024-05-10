@@ -352,6 +352,18 @@ class Bocal(object):
     def _update_shake(self, dt):
         """ secoue le bocal
         """
+
+        def auto_shake_x(t):
+            assert(t >= 0)
+            d = SHAKE_ACCEL_DELAY
+            f1 = SHAKE_FREQ_MIN
+            f2 = SHAKE_FREQ_MAX
+            k = (f2-f1)/2
+            if( t < SHAKE_ACCEL_DELAY ):
+                return 2 * math.pi * t * (f1 + k*t/d )
+            else:
+                return 2 * math.pi * t * (f2 - k*d/t  )
+
         if(self._shake==SHAKE_OFF):
             return
 
@@ -359,10 +371,7 @@ class Bocal(object):
         elif( self._shake == SHAKE_AUTO ):
             (x_ref, y_ref) =  self._position_ref
             t = utils.now() - self._shake_start_time
-            freq = min(
-                SHAKE_FREQ_MAX, 
-                (SHAKE_FREQ_MIN + t/SHAKE_ACCEL_DELAY * (SHAKE_FREQ_MAX-SHAKE_FREQ_MIN)))
-            p  =  ( x_ref + SHAKE_AMPLITUDE_X * math.sin( 2 * math.pi * freq * t), y_ref ) 
+            p  =  ( x_ref + SHAKE_AMPLITUDE_X * math.sin( auto_shake_x(t) ), y_ref ) 
             #print(f"shake postion={math.sin( 2 * math.pi * freq * t):0.2f} freq={freq}Hz  t={t}s")
             # vitesse pour atteindre la position au prochain step
             velocity = (p - self._body.position)/dt
@@ -370,7 +379,7 @@ class Bocal(object):
         # retour amorti à la position de reference
         elif( self._shake == SHAKE_STOPPING ):
             dist = self._position_ref - self._body.position 
-            velocity =  dist / (dt *10) 
+            velocity =  SHAKE_RETURN_SPEED * dist / dt
 
             # condition d'arret de l'amorti
             dist_from_position_ref = (self._body.position - self._position_ref)
@@ -383,7 +392,7 @@ class Bocal(object):
         # se dirige vers la position cible du mouseshake
         elif( self._shake == SHAKE_MOUSE ):
             dist = self._shake_mouse_target - self._body.position
-            velocity =  dist / (dt*3) 
+            velocity =  SHAKE_MOUSE_SPEED * dist / dt
 
         self._body.velocity = velocity
 
