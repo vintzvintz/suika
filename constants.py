@@ -24,19 +24,18 @@ BOCAL_MIN_HEIGHT=400
 
 ############ Simulation physique #############
 PYMUNK_INTERVAL = 1 / 180.0     # cadence simulation physique
-FRICTION = 0.80
+FRICTION = 1.0
 GRAVITY = -981
 INITIAL_VELOCITY = 1200
-ELASTICITY_FRUIT = 0.35
-ELASTICITY_WALLS = 0.35
+ELASTICITY_FRUIT = 0.05
+ELASTICITY_WALLS = 0.05
 
 
 ############ Animations et temporisations du jeu #############
-AUTOPLAY_INTERVAL = 250 / WINDOW_WIDTH 
-AUTOPLAY_INTERVAL_BASE = 100 
+AUTOPLAY_INTERVAL_BASE = 0.05       # secondes
 
-PREVIEW_SHIFT_DELAY = 0.95 * AUTOPLAY_INTERVAL  # seconds
-AUTOFIRE_DELAY = 0.5   # secondes 
+PREVIEW_SHIFT_DELAY = 0.1  # secondes
+AUTOFIRE_DELAY = 0.5       # secondes 
 SHAKE_FREQ_MIN = 1.5       # Hz
 SHAKE_FREQ_MAX = 5         # Hz
 SHAKE_ACCEL_DELAY = 0.5    # secondes

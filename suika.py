@@ -1,5 +1,5 @@
 
-import math
+
 import pyglet as pg
 import pymunk as pm
 
@@ -12,7 +12,53 @@ import utils
 from preview import FruitQueue
 import sprites
 
-AUTOPLAY_ON ='on'
+AUTOPLAY_INITIAL_RATE = 25
+
+class Autoplayer(object):
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self._rate = 0
+        self.disable()
+
+    def get_rate(self):
+        return self._rate
+
+    def enable(self):
+        if( not self._enabled ):
+            self._enabled = True
+            if( self._rate==0 ):
+                self._rate = AUTOPLAY_INITIAL_RATE
+
+    def disable(self):
+        self._time_debt = 0
+        self._enabled = False
+
+    def toggle(self):
+        if( not self._enabled ):
+             self.enable()
+        else:
+            self.disable()
+
+    def adjust_rate( self, adj ):
+        self._time_debt = 0
+        if( adj>0 and self._rate==0 ):
+            self._rate = AUTOPLAY_INITIAL_RATE
+        else:
+            self._rate = max( 0, self._rate+adj )
+        print(f"autoplayer rate = {self._rate} fruits/sec")
+
+    def step(self, dt):
+        # appelé à chaque frame
+        # renvoie le nombre de fruits à lacher sur la frame courante
+        if( not self._enabled or self._rate == 0 ):
+            return 0
+        t = self._time_debt + dt
+        nb = int( t * self._rate )
+        self._time_debt = t - nb/self._rate
+        return nb
+
 
 class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
@@ -25,9 +71,9 @@ class SuikaWindow(pg.window.Window):
         self._countdown = utils.CountDown()
         self._gui = gui.GUI( window_width=width, window_height=height )
         self._collision_helper = CollisionHelper(self._space)
-        #pg.clock.schedule( self.simulation_step )
+        self._autoplayer = Autoplayer()
         pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
-        #pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL_BASE)
+        pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL_BASE)
         self.display_fps = utils.Speedmeter()        
         self.pymunk_fps = utils.Speedmeter(bufsize=500)
 
@@ -39,9 +85,7 @@ class SuikaWindow(pg.window.Window):
     def reset_game(self):
         self._is_gameover = False
         self._is_paused = False
-        self._autoplay_on = False
         self._autofire_on = False
-        self._autoplay_level = 0
         self._autoplay_txt = ""
         self._is_mouse_shake = False
         self._is_benchmark_mode = False
@@ -64,41 +108,33 @@ class SuikaWindow(pg.window.Window):
         else:
             pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
 
-
-    def adjust_autoplay_level(self, adj):
-        """ Niveau de l'autoplay, en relatif par rapport à BASE_INTERVAL
-        """
-        self._autoplay_level = min( max( 0, self._autoplay_level + adj ), 100 )
-        pg.clock.unschedule( self.autoplay )
-        interval = self._autoplay_interval()
-        print(f"autoplay interval = {interval}")
-        if( interval ):
-            pg.clock.schedule_interval( self.autoplay, interval=interval )
-
-
-    def _autoplay_interval(self):
-        #TODO: logarithmique
-        if( self._autoplay_level <= 0 ):
-            return None
-        return AUTOPLAY_INTERVAL_BASE / math.exp(self._autoplay_level)
-
-
     def prepare_next(self):
         kind = self._preview.get_next_fruit()
         self._fruits.prepare_next( kind=kind )
 
 
-    def drop(self, x):
+    def drop(self, cursor_x, nb=1):
+        if( cursor_x is None):
+            # autoplay
+            for _ in range(nb):
+                self._drop_random_one(cursor_x)
+        else:
+            #autofire
+            for _ in range(nb):
+                self._drop_random_one(cursor_x)
+
+
+    def _drop_random_one(self, cursor_x):
         next = self._fruits.peek_next()
         if( not next ):
             return
         margin=next.radius + WALL_THICKNESS/2 + 1
 
         # position de la souris ou random si x = None 
-        if( x is None ):
+        if( cursor_x is None ):
             pos = self._bocal.drop_point_random( margin=margin )
         else:
-            pos = self._bocal.drop_point_from_clic( x, margin=margin )
+            pos = self._bocal.drop_point_cursor( cursor_x, margin=margin )
 
         # pos==None si clic hors du bocal
         if( not pos ):
@@ -108,23 +144,27 @@ class SuikaWindow(pg.window.Window):
 
 
     def autoplay(self, dt):
-        msg = []
         if( self._is_paused or self._is_gameover ):
-            #self._autoplay_txt = ""
-            pass
-        elif( self._mouse_drag_x ):
+            self._autoplay_txt = ""
+            return
+        msg = []
+        nb = self._autoplayer.step(dt)
+        # autofire ( = autoplay contrôlé à la souris )
+        if( self._mouse_drag_x ):
             t = utils.now() - self._left_click_start 
             if( t > AUTOFIRE_DELAY ):
-                self.drop(x=self._mouse_drag_x)
-                self._autofire_on = True
-                msg.append("AUTOFIRE (clic to disengage)")
-        elif( self._autoplay_on ):
-            self.drop(x=None)
-            msg.append("AUTOPLAY")
-        else:
-            pass
-            #self._autoplay_txt = ""
+                self._autoplayer.enable()   # active l'autoplay automatiquement
+                self._autofire_on = True    # pour continuer le clic continue même si on relâche le bouton
+                self.drop(cursor_x=self._mouse_drag_x, nb=nb)
+                msg.append(f"AUTOFIRE")
+        # autoplay ( drop sur emplacement random )
+        elif( self._autoplayer._enabled):
+            self.drop(nb=nb, cursor_x=None)
+            msg.append(f"AUTOPLAY")
 
+        # ajoute le débit de l'autoplay/autofire seulement  si actif.
+        if(len(msg)):
+            msg.append(f"{self._autoplayer.get_rate()} fruits/sec")
         self._autoplay_txt = ' '.join(msg)
 
 
@@ -133,13 +173,9 @@ class SuikaWindow(pg.window.Window):
         """
         print("GAMEOVER")
         self._is_gameover = True    # inhibe les actions de jeu
+        self._autofire_on = False
         self._fruits.gameover()
         self._gui.show_gameover()
-
-
-    def toggle_autoplay(self):
-        assert( not self._is_gameover )
-        self._autoplay_on = not self._autoplay_on
 
 
     def toggle_pause(self):
@@ -236,7 +272,6 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_draw(self):
-
         # met a jour les positions des fruits et les widgets du GUI
         self._fruits.update()
         self._preview.update()
@@ -252,14 +287,15 @@ class SuikaWindow(pg.window.Window):
     def on_key_press(self, symbol, modifiers):
         #print(f"key {symbol} was pressed")
         if(symbol == pg.window.key.D):        # DEBUG
-            utils.print_counters()
+            #utils.print_counters()
+            print(f"autoplayer enabled={self._autoplayer._enabled} autofire_on={self._autofire_on} rate={self._autoplayer.get_rate()}")
 
         if(symbol == pg.window.key.ESCAPE):        # ESC ferme le jeu dans tous les cas
             self.end_application()
         elif(self._is_gameover or symbol==pg.window.key.R):    # n'importe quelle touche relance une partie apres un gameover
             self.reset_game()
         elif(symbol == pg.window.key.A):           # A controle l'autoplay
-            self.toggle_autoplay()
+            self._autoplayer.toggle()
         elif(symbol == pg.window.key.T):           # Mode machine à laver
             self._countdown.update( deborde=False )
             self._bocal.tumble_once()
@@ -287,7 +323,11 @@ class SuikaWindow(pg.window.Window):
             self._bocal.shake_stop()
 
     def on_mouse_press(self, x, y, button, modifiers):
-        self._autofire_on = False
+        # arrete l'autofire.autoplay lorsqu'il est actif
+        if( self._autofire_on ):
+            self._autofire_on = False
+            self._autoplayer.disable()
+
         if( self._is_gameover ):
             # relance une partie si la précédente est terminée
             self.reset_game()
@@ -300,7 +340,6 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_mouse_release(self, x, y, button, modifiers):
-
         if( (button & pg.window.mouse.LEFT) ):
             if( not self._autofire_on ):
                 self._left_click_start = None
@@ -309,18 +348,19 @@ class SuikaWindow(pg.window.Window):
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if( (buttons & pg.window.mouse.LEFT) ):
-            #print( f"on_mouse_drag(x={x}, y={y}, dx={dx} dy={dy})")
+            print( f"on_mouse_drag(x={x}, y={y}, dx={dx} dy={dy})")
             self._mouse_drag_x = x
 
 
     def on_mouse_motion(self, x, y, dx, dy):
         if( self._autofire_on ):
-            self.on_mouse_drag(x, y, dx, dy, pg.window.mouse.LEFT, None )
-            print( f"on_mouse_motion(x={x}, y={y}, dx={dx} dy={dy})")
+            self._mouse_drag_x = x
+#            self.on_mouse_drag(x, y, dx, dy, pg.window.mouse.LEFT, None )
+            #print( f"on_mouse_motion(x={x}, y={y}, dx={dx} dy={dy})")
 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
-        print(f"on_mouse_scroll(x={x} y={y} scroll_x={scroll_x} scroll_y={scroll_y}    => lvl={self._autoplay_level}")
-        self.adjust_autoplay_level(scroll_y)
+        #print(f"on_mouse_scroll(x={x} y={y} scroll_x={scroll_x} scroll_y={scroll_y}    => lvl={self._autoplay_level}")
+        self._autoplayer.adjust_rate(scroll_y)
 
 
     def on_resize(self, width, height):

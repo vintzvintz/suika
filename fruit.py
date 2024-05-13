@@ -34,20 +34,15 @@ def mode_mini(fruits):
         fruit_mini = {}
         for k,v in f.items():
             if( k=='radius' ):
-                fruit_mini[k] = v/5
+                fruit_mini[k] = v/4
             else:
                 fruit_mini[k] = v
         ret.append( fruit_mini)
     return ret
 
 
-
-#_FRUITS_DEF = _FRUITS_DEF_ORIGINAL
-_FRUITS_DEF = mode_mini( _FRUITS_DEF_ORIGINAL )
-
-
-
-
+_FRUITS_DEF = _FRUITS_DEF_ORIGINAL
+#_FRUITS_DEF = mode_mini( _FRUITS_DEF_ORIGINAL )
 _FRUITS_RANDOM = [ 1,2,3,4 ]
 
 def nb_fruits():
@@ -109,7 +104,7 @@ def _get_new_id():
     return _g_fruit_id
 
 
-# POUR DEBUG transitions old-> new valides
+# POUR DEBUG tchangements de mode possibles 
 g_valid_transitions = {
     MODE_WAIT : ( MODE_FIRST_DROP, MODE_NORMAL, MODE_MERGE, MODE_REMOVED ),    # mode initial à la creation
     MODE_FIRST_DROP : (MODE_NORMAL, MODE_MERGE, MODE_REMOVED),

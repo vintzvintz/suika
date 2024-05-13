@@ -214,7 +214,7 @@ class DropZone(object):
         point = self._a + (self._b - self._a) * r
         return  self._bocal_body.local_to_world( point )
 
-    def drop_point_from_clic(self, x_clic, margin ):
+    def drop_point_cursor(self, x_cursor, margin ):
         """ Renvoie 
         soit le point de lacher d'un fruit en fonction du point cliqué
         soit None si le point est hors du bocal
@@ -224,7 +224,7 @@ class DropZone(object):
 
         #  r = abscisse normalisée sur la dropline
         if( abs(x_right - x_left) > 1.0 ):
-            r = (x_clic - x_left)  / ( x_right - x_left )
+            r = (x_cursor - x_left)  / ( x_right - x_left )
         else:
             r = 0.5    # cas particulier du bocal horizontal, sinon division par 0
 
@@ -448,8 +448,8 @@ class Bocal(object):
             self.shake_stop()  # pour déplacer lentement le body vers la nouvelle position de ref.
 
 
-    def drop_point_from_clic(self, x_clic, margin ):
-        return self._dropzone.drop_point_from_clic(x_clic, margin=margin/self.width)
+    def drop_point_cursor(self, x_cursor, margin ):
+        return self._dropzone.drop_point_cursor(x_cursor, margin=margin/self.width)
 
 
     def drop_point_random(self, margin):
