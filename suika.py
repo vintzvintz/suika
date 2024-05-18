@@ -12,7 +12,7 @@ import utils
 from preview import FruitQueue
 import sprites
 
-AUTOPLAY_INITIAL_RATE = 25
+AUTOPLAY_INITIAL_RATE = 5
 
 class Autoplayer(object):
     def __init__(self):
@@ -60,6 +60,72 @@ class Autoplayer(object):
         return nb
 
 
+
+class MouseState(object):
+    """
+    Utilitaire pour suivre l'état de la souris (position, boutons)
+    """
+
+    def __init__(self, window):
+        # callbacks
+        self.on_autofire_stop = None
+
+        window.push_handlers( 
+            self.on_mouse_motion,
+            self.on_mouse_drag,
+            self.on_mouse_press,
+            self.on_mouse_release )
+        self.reset()
+
+    def reset(self):
+        self._autofire_on = False
+        self._left_click_start = None
+        self.position = None
+
+
+    @property
+    def autofire(self):
+        if( not self._left_click_start ):
+            return False
+        if( not self._autofire_on ):
+            t = utils.now() - self._left_click_start
+            if( t > AUTOFIRE_DELAY ):
+                self._autofire_on = True
+        return self._autofire_on
+
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        ret = pg.event.EVENT_UNHANDLED
+        # arrete l'autofire.autoplay lorsqu'il est actif
+        if( self._autofire_on ):
+            self._autofire_on = False
+            if( self.on_autofire_stop ):
+                self.on_autofire_stop()
+            ret = pg.event.EVENT_HANDLED
+        # note le moment du début du clic
+        if( (button & pg.window.mouse.LEFT) ):
+            self._left_click_start = utils.now()
+            self.position = (x, y)
+        return ret
+
+
+    def on_mouse_release(self, x, y, button, modifiers):
+        if( (button & pg.window.mouse.LEFT) ):
+            if( not self._autofire_on ):
+                self._left_click_start = None
+
+
+    def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
+        if( (buttons & pg.window.mouse.LEFT) ):
+            #print( f"on_mouse_drag(x={x}, y={y}, dx={dx} dy={dy})")
+            self.position = (x,y) 
+
+
+    def on_mouse_motion(self, x, y, dx, dy):
+        self.position = (x, y)
+
+
+
 class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
         super().__init__(width=width, height=height, resizable=True, )
@@ -72,10 +138,13 @@ class SuikaWindow(pg.window.Window):
         self._gui = gui.GUI( window_width=width, window_height=height )
         self._collision_helper = CollisionHelper(self._space)
         self._autoplayer = Autoplayer()
-        pg.clock.schedule_interval( self.simulation_step, interval=PYMUNK_INTERVAL )
-        pg.clock.schedule_interval( self.autoplay, interval=AUTOPLAY_INTERVAL_BASE)
+        pg.clock.schedule_interval( self.simulation_tick, interval=PYMUNK_INTERVAL )
+        pg.clock.schedule_interval( self.autoplay_tick, interval=AUTOPLAY_INTERVAL_BASE)
         self.display_fps = utils.Speedmeter()        
         self.pymunk_fps = utils.Speedmeter(bufsize=500)
+
+        self._mouse_state = MouseState( window=self )
+        self._mouse_state.on_autofire_stop = self._autoplayer.disable
 
         self.set_caption("Pastèque")
         self.set_minimum_size( width = 2 * BOCAL_MARGIN_SIDE + BOCAL_MIN_WIDTH,
@@ -85,12 +154,9 @@ class SuikaWindow(pg.window.Window):
     def reset_game(self):
         self._is_gameover = False
         self._is_paused = False
-        self._autofire_on = False
         self._autoplay_txt = ""
         self._is_mouse_shake = False
         self._is_benchmark_mode = False
-        self._left_click_start = None
-        self._mouse_drag_x = None
         self._bocal.reset()
         self._preview.reset()
         self._fruits.reset()
@@ -143,26 +209,25 @@ class SuikaWindow(pg.window.Window):
         self.prepare_next()
 
 
-    def autoplay(self, dt):
+    def autoplay_tick(self, dt):
         if( self._is_paused or self._is_gameover ):
             self._autoplay_txt = ""
             return
         msg = []
         nb = self._autoplayer.step(dt)
         # autofire ( = autoplay contrôlé à la souris )
-        if( self._mouse_drag_x ):
-            t = utils.now() - self._left_click_start 
-            if( t > AUTOFIRE_DELAY ):
-                self._autoplayer.enable()   # active l'autoplay automatiquement
-                self._autofire_on = True    # pour continuer le clic continue même si on relâche le bouton
-                self.drop(cursor_x=self._mouse_drag_x, nb=nb)
+        if( self._mouse_state.autofire ):
+            self._autoplayer.enable()   # active l'autoplay
+            pos = self._mouse_state.position    # None si le pointeur est en dehors de la fenetre
+            if(pos):
+                self.drop(cursor_x=self._mouse_state.position[0], nb=nb) 
                 msg.append(f"AUTOFIRE")
         # autoplay ( drop sur emplacement random )
         elif( self._autoplayer._enabled):
             self.drop(nb=nb, cursor_x=None)
             msg.append(f"AUTOPLAY")
 
-        # ajoute le débit de l'autoplay/autofire seulement  si actif.
+        # ajoute le débit de l'autoplay/autofire seulement si actif.
         if(len(msg)):
             msg.append(f"{self._autoplayer.get_rate()} fruits/sec")
         self._autoplay_txt = ' '.join(msg)
@@ -206,7 +271,7 @@ class SuikaWindow(pg.window.Window):
         self._fruits.spawn( kind, position )
 
 
-    def simulation_step(self, dt):
+    def simulation_tick(self, dt):
         """Avance d'un pas la simulation physique
         appelé par un timer de window.on_draw()
         """
@@ -304,6 +369,8 @@ class SuikaWindow(pg.window.Window):
         elif(symbol == pg.window.key.SPACE):        # SPACE met en mode MOUSE_SHAKE
             self._bocal.shake_mouse()
             self.push_handlers( self._bocal.on_mouse_motion )
+        elif(symbol == pg.window.key.M):
+            pass
         elif(symbol == pg.window.key.P):        # P met le jeu en pause
             self.toggle_pause()
         elif(symbol == pg.window.key.G):        # G force un gameover en cours de partie
@@ -316,47 +383,22 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_key_release(self, symbol, modifiers):
-        if(symbol == pg.window.key.SPACE):       # arrete de secouee le bocal automatiquement
+        if(symbol == pg.window.key.SPACE):       # arrete la secousse manuelle
             self._bocal.shake_stop()
             self.pop_handlers()
-        if(symbol == pg.window.key.S):       # arrete de secouee le bocal automatiquement
+        if(symbol == pg.window.key.S):       # arrete la secousse automatique
             self._bocal.shake_stop()
 
-    def on_mouse_press(self, x, y, button, modifiers):
-        # arrete l'autofire.autoplay lorsqu'il est actif
-        if( self._autofire_on ):
-            self._autofire_on = False
-            self._autoplayer.disable()
 
+    def on_mouse_press(self, x, y, button, modifiers):
         if( self._is_gameover ):
             # relance une partie si la précédente est terminée
             self.reset_game()
         elif( (button & pg.window.mouse.LEFT) ):
-            self._left_click_start = utils.now()
-            self._mouse_drag_x = x
             self.drop(x)
         elif( (button & pg.window.mouse.RIGHT) ):
             self.shoot_fruit(x, y)
 
-
-    def on_mouse_release(self, x, y, button, modifiers):
-        if( (button & pg.window.mouse.LEFT) ):
-            if( not self._autofire_on ):
-                self._left_click_start = None
-                self._mouse_drag_x = None
-
-
-    def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
-        if( (buttons & pg.window.mouse.LEFT) ):
-            print( f"on_mouse_drag(x={x}, y={y}, dx={dx} dy={dy})")
-            self._mouse_drag_x = x
-
-
-    def on_mouse_motion(self, x, y, dx, dy):
-        if( self._autofire_on ):
-            self._mouse_drag_x = x
-#            self.on_mouse_drag(x, y, dx, dy, pg.window.mouse.LEFT, None )
-            #print( f"on_mouse_motion(x={x}, y={y}, dx={dx} dy={dy})")
 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
         #print(f"on_mouse_scroll(x={x} y={y} scroll_x={scroll_x} scroll_y={scroll_y}    => lvl={self._autoplay_level}")
