@@ -180,33 +180,23 @@ class SuikaWindow(pg.window.Window):
 
 
     def drop(self, cursor_x, nb=1):
-        if( cursor_x is None):
-            # autoplay
-            for _ in range(nb):
-                self._drop_random_one(cursor_x)
-        else:
-            #autofire
-            for _ in range(nb):
-                self._drop_random_one(cursor_x)
+        for _ in range(nb):
+            next = self._fruits.peek_next()
+            if( not next ):
+                return
+            margin=next.radius + WALL_THICKNESS/2 + 1
 
+            # position de la souris ou random si x = None 
+            if( cursor_x is None ):
+                pos = self._bocal.drop_point_random( margin=margin )
+            else:
+                pos = self._bocal.drop_point_cursor( cursor_x, margin=margin )
 
-    def _drop_random_one(self, cursor_x):
-        next = self._fruits.peek_next()
-        if( not next ):
-            return
-        margin=next.radius + WALL_THICKNESS/2 + 1
-
-        # position de la souris ou random si x = None 
-        if( cursor_x is None ):
-            pos = self._bocal.drop_point_random( margin=margin )
-        else:
-            pos = self._bocal.drop_point_cursor( cursor_x, margin=margin )
-
-        # pos==None si clic hors du bocal
-        if( not pos ):
-            return
-        self._fruits.drop_next(pos)
-        self.prepare_next()
+            # pos==None si clic hors du bocal
+            if( not pos ):
+                return
+            self._fruits.drop_next(pos)
+            self.prepare_next()
 
 
     def autoplay_tick(self, dt):
@@ -370,7 +360,7 @@ class SuikaWindow(pg.window.Window):
             self._bocal.shake_mouse()
             self.push_handlers( self._bocal.on_mouse_motion )
         elif(symbol == pg.window.key.M):
-            pass
+            self.fruit_drag_start()
         elif(symbol == pg.window.key.P):        # P met le jeu en pause
             self.toggle_pause()
         elif(symbol == pg.window.key.G):        # G force un gameover en cours de partie
@@ -386,8 +376,11 @@ class SuikaWindow(pg.window.Window):
         if(symbol == pg.window.key.SPACE):       # arrete la secousse manuelle
             self._bocal.shake_stop()
             self.pop_handlers()
-        if(symbol == pg.window.key.S):       # arrete la secousse automatique
+        elif(symbol == pg.window.key.S):       # arrete la secousse automatique
             self._bocal.shake_stop()
+        elif(symbol == pg.window.key.M):
+            self.fruit_drag_stop()
+
 
 
     def on_mouse_press(self, x, y, button, modifiers):
