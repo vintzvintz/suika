@@ -51,6 +51,7 @@ def nb_fruits():
 MODE_WAIT = 'wait'
 MODE_FIRST_DROP = 'first_drop'
 MODE_NORMAL = 'normal'
+MODE_DRAG = 'drag'
 MODE_MERGE = 'merge'
 MODE_REMOVED = 'removed'
 
@@ -82,6 +83,12 @@ _FRUIT_MODES = {
         VISI: VISI_NORMAL,
         BODY_TYPE: pm.Body.DYNAMIC
     },
+    MODE_DRAG: {
+        COLLISION_CAT: CAT_FRUIT,
+        COLLISION_MASK: CAT_FRUIT_DROP | CAT_FRUIT | CAT_MAXLINE,
+        VISI: VISI_NORMAL,
+        BODY_TYPE: pm.Body.KINEMATIC
+    },
     MODE_MERGE: {
         COLLISION_CAT: CAT_FRUIT_MERGE,
         COLLISION_MASK: 0x00,   # collision avec les murs uniqement
@@ -104,13 +111,14 @@ def _get_new_id():
     return _g_fruit_id
 
 
-# POUR DEBUG tchangements de mode possibles 
+# POUR DEBUG : changements de mode autorisés
 g_valid_transitions = {
-    MODE_WAIT : ( MODE_FIRST_DROP, MODE_NORMAL, MODE_MERGE, MODE_REMOVED ),    # mode initial à la creation
+    MODE_WAIT : (MODE_FIRST_DROP, MODE_NORMAL, MODE_REMOVED),    # mode initial à la creation
     MODE_FIRST_DROP : (MODE_NORMAL, MODE_MERGE, MODE_REMOVED),
-    MODE_NORMAL : (MODE_MERGE, MODE_REMOVED),
-    MODE_MERGE : ( MODE_REMOVED,),
-    MODE_REMOVED : ( MODE_REMOVED,)
+    MODE_NORMAL : (MODE_MERGE, MODE_DRAG, MODE_REMOVED),
+    MODE_DRAG : (MODE_NORMAL, MODE_MERGE, MODE_REMOVED),
+    MODE_MERGE : (MODE_REMOVED,),
+    MODE_REMOVED : (MODE_REMOVED,)
 }
 
 
@@ -172,6 +180,7 @@ class Fruit( object ):
         }
         self._fruit_mode = None
         self._dash_start_time = None
+        self._drag_offset = None
         self._set_mode( mode )
         #print( f"{self} created" )
 
@@ -339,16 +348,39 @@ class Fruit( object ):
         self._sprite[SPRITE_MAIN].fadeout = True
 
 
+    def drag_mode(self, cursor):
+        if( cursor ):
+            self._drag_offset = - self._body.position + cursor
+            self._set_mode( MODE_DRAG )
+        else:
+            self._drag_offset = None
+            self._set_mode( MODE_NORMAL )
+
+
+    def drag_to(self, cursor, dt):
+        if( self._fruit_mode not in [MODE_NORMAL, MODE_DRAG] ):
+            return
+        assert self._drag_offset,   "initialisation incorrecte du mode drag"
+        assert self._fruit_mode == MODE_DRAG,     "mode drag non initialisé"
+        self.set_velocity_to( dest= cursor-self._drag_offset, delay=dt*10 )
+
+
     def merge_to(self, dest):
         if( self._fruit_mode==MODE_MERGE):
             return
         self._set_mode( MODE_MERGE )  # plus de collisions avec les fruits
+        self.set_velocity_to(dest, delay=MERGE_DELAY)
+        pg.clock.schedule_once(lambda dt : self.remove(), delay=MERGE_DELAY )
+
+
+    def set_velocity_to(self, dest, delay):
         (x0, y0) = self._body.position
         (x1, y1) = dest
-        v = ((x1-x0)/MERGE_DELAY, (y1-y0)/MERGE_DELAY)
+        v = pm.Vec2d((x1-x0)/delay, (y1-y0)/delay)
+        if( v.length < 0.00001 ):
+            v= (0,0)
         self._body.velocity = v
-        pg.clock.schedule_once(lambda dt : self.remove(), delay=MERGE_DELAY )
-    
+
 
     def explose(self):
         if( self._fruit_mode in [MODE_MERGE, MODE_REMOVED] ):
@@ -366,7 +398,6 @@ class Fruit( object ):
         if self._is_deleted():
             return False
         x, y = self._body.position
-        #return   (x < 0) or (y < 0) or (x>WINDOW_WIDTH) or (y>WINDOW_HEIGHT)
         return y < -WINDOW_HEIGHT 
     
     # retire le fruit du jeu. l'objet ne doit plus être utilisé ensuite.

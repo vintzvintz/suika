@@ -69,6 +69,7 @@ class MouseState(object):
     def __init__(self, window):
         # callbacks
         self.on_autofire_stop = None
+        self.on_fruit_drag = None
 
         window.push_handlers( 
             self.on_mouse_motion,
@@ -118,11 +119,17 @@ class MouseState(object):
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if( (buttons & pg.window.mouse.LEFT) ):
             #print( f"on_mouse_drag(x={x}, y={y}, dx={dx} dy={dy})")
-            self.position = (x,y) 
-
+            self._set_pos(x, y)
+    
 
     def on_mouse_motion(self, x, y, dx, dy):
+        self._set_pos(x, y)
+
+
+    def _set_pos(self, x, y):
         self.position = (x, y)
+        if( self.on_fruit_drag ):
+            self.on_fruit_drag( x, y )
 
 
 
@@ -157,6 +164,7 @@ class SuikaWindow(pg.window.Window):
         self._autoplay_txt = ""
         self._is_mouse_shake = False
         self._is_benchmark_mode = False
+        self._dragged_fruit = None
         self._bocal.reset()
         self._preview.reset()
         self._fruits.reset()
@@ -242,17 +250,35 @@ class SuikaWindow(pg.window.Window):
         self._is_mouse_shake = bool(activate)
 
 
-    def shoot_fruit(self, x, y):
-        print(f"right click x={x} y={y}")
+    def fruit_drag_start(self):
+        # passe le fruit sous la souris en mode DRAG
+        cursor = self._mouse_state.position
+        self._dragged_fruit = self.find_fruit_at( *cursor )
+        if( self._dragged_fruit) :
+            self._dragged_fruit.drag_mode( cursor )   # set_mode
+
+
+    def fruit_drag_stop(self):
+        if( self._dragged_fruit ):
+            self._dragged_fruit.drag_mode( None )   # set_mode
+            self._dragged_fruit = None
+
+
+    def find_fruit_at(self, x, y):
         qi = self._space.point_query( (x, y), max_distance=0, shape_filter=pm.ShapeFilter() )
         if( len(qi)==0 ):
-            return
+            return None
         if( len(qi) > 1):
             print("WARNING: pluiseurs fruits superposés ??")
         if( not hasattr( qi[0].shape, 'fruit' )):
-           return
-        f = qi[0].shape.fruit
-        if( not self._is_gameover ):
+           return None     # la forme n'est pas un fruit (ex: bocal)
+        return qi[0].shape.fruit
+
+
+    def shoot_fruit(self, x, y):
+        print(f"right click x={x} y={y}")
+        f = self.find_fruit_at(x, y)
+        if( not self._is_gameover and f ):
             f.explose()
 
 
@@ -269,12 +295,17 @@ class SuikaWindow(pg.window.Window):
         if( self._is_paused ):
             return
 
-        fps = self.pymunk_fps.value
-        if( fps>0 ):
-            dt = 1.0 / fps
+        # fps = self.pymunk_fps.value
+        # if( fps>0 ):
+        #     dt = 1.0 / fps
+
+        dt = PYMUNK_INTERVAL
 
         # met à jour la position des éléments du bocal
         self._bocal.step(dt)
+        # met à jour le fruit en DRAG_MODE
+        if( self._dragged_fruit ):
+            self._dragged_fruit.drag_to( self._mouse_state.position, dt)
         # prepare le gestionnaire de collisions
         self._collision_helper.reset()
         # execute 1 pas de simulation physique
