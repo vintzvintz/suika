@@ -33,6 +33,7 @@ ELASTICITY_WALLS = 0.05
 
 ############ Animations et temporisations du jeu #############
 AUTOPLAY_INTERVAL_BASE = 0.05       # secondes
+AUTOPLAY_INITIAL_RATE = 5
 
 PREVIEW_SHIFT_DELAY = 0.1  # secondes
 AUTOFIRE_DELAY = 0.5       # secondes 

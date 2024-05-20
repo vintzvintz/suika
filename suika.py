@@ -1,5 +1,3 @@
-
-
 import pyglet as pg
 import pymunk as pm
 
@@ -12,7 +10,6 @@ import utils
 from preview import FruitQueue
 import sprites
 
-AUTOPLAY_INITIAL_RATE = 5
 
 class Autoplayer(object):
     def __init__(self):
@@ -60,7 +57,6 @@ class Autoplayer(object):
         return nb
 
 
-
 class MouseState(object):
     """
     Utilitaire pour suivre l'état de la souris (position, boutons)
@@ -97,14 +93,14 @@ class MouseState(object):
 
     def on_mouse_press(self, x, y, button, modifiers):
         ret = pg.event.EVENT_UNHANDLED
-        # arrete l'autofire.autoplay lorsqu'il est actif
-        if( self._autofire_on ):
+
+        if( self._autofire_on ):                     # arrete l'autofire/autoplay lorsqu'il est actif
             self._autofire_on = False
             if( self.on_autofire_stop ):
                 self.on_autofire_stop()
-            ret = pg.event.EVENT_HANDLED
-        # note le moment du début du clic
-        if( (button & pg.window.mouse.LEFT) ):
+            ret = pg.event.EVENT_HANDLED             # pour eviter de dropper un fruit sur la partie suivante
+        
+        if( (button & pg.window.mouse.LEFT) ):      # note le moment du début du clic
             self._left_click_start = utils.now()
             self.position = (x, y)
         return ret
@@ -132,7 +128,6 @@ class MouseState(object):
             self.on_fruit_drag( x, y )
 
 
-
 class SuikaWindow(pg.window.Window):
     def __init__(self, width=WINDOW_WIDTH, height=WINDOW_HEIGHT):
         super().__init__(width=width, height=height, resizable=True, )
@@ -148,7 +143,7 @@ class SuikaWindow(pg.window.Window):
         pg.clock.schedule_interval( self.simulation_tick, interval=PYMUNK_INTERVAL )
         pg.clock.schedule_interval( self.autoplay_tick, interval=AUTOPLAY_INTERVAL_BASE)
         self.display_fps = utils.Speedmeter()        
-        self.pymunk_fps = utils.Speedmeter(bufsize=500)
+        self.pymunk_fps = utils.Speedmeter(bufsize= int(3/PYMUNK_INTERVAL) )  
 
         self._mouse_state = MouseState( window=self )
         self._mouse_state.on_autofire_stop = self._autoplayer.disable
@@ -169,9 +164,11 @@ class SuikaWindow(pg.window.Window):
         self._preview.reset()
         self._fruits.reset()
         self._collision_helper.reset()
+        self._countdown.reset()
         self._gui.reset()
-        self._countdown.update( deborde=False )
-        self.prepare_next( )
+        self._autoplayer.reset()
+        self._mouse_state.reset()
+        self.prepare_next()
 
 
     def toggle_benchmark_mode( self ):
@@ -200,8 +197,7 @@ class SuikaWindow(pg.window.Window):
             else:
                 pos = self._bocal.drop_point_cursor( cursor_x, margin=margin )
 
-            # pos==None si clic hors du bocal
-            if( not pos ):
+            if( not pos ):            # pos==None si clic hors du bocal
                 return
             self._fruits.drop_next(pos)
             self.prepare_next()
@@ -295,12 +291,6 @@ class SuikaWindow(pg.window.Window):
         if( self._is_paused ):
             return
 
-        # fps = self.pymunk_fps.value
-        # if( fps>0 ):
-        #     dt = 1.0 / fps
-
-        dt = PYMUNK_INTERVAL
-
         # met à jour la position des éléments du bocal
         self._bocal.step(dt)
         # met à jour le fruit en DRAG_MODE
@@ -309,8 +299,7 @@ class SuikaWindow(pg.window.Window):
         # prepare le gestionnaire de collisions
         self._collision_helper.reset()
         # execute 1 pas de simulation physique
-        #self._space.step( PYMUNK_INTERVAL )  
-        self._space.step( dt )  
+        self._space.step( PYMUNK_INTERVAL )  
 
         # modifie les fruits selon les collisions détectées
         self._collision_helper.process( 
@@ -339,21 +328,14 @@ class SuikaWindow(pg.window.Window):
         if( self._is_gameover ):  game_status = "GAME OVER"
 
         self._gui.update_dict( {
-            gui.TOP_LEFT: f"Fruits {len(self._fruits._fruits)}",
-           # gui.TOP_LEFT: f"score {self._fruits._score}",
+            #gui.TOP_LEFT: f"Fruits {len(self._fruits._fruits)}",
+            gui.TOP_LEFT: f"score {self._fruits._score}",
             gui.TOP_RIGHT: f"FPS {self.pymunk_fps.value:.0f} / {self.display_fps.value:.0f}",
             gui.TOP_CENTER: game_status } )
 
 
     def end_application(self):
-        # self._bocal.delete()
-        # self._preview.delete()
-        # self._fruits.delete()
-        # self._countdown.delete()
-        # self._gui.delete()
-        # self._collision_helper.delete()
-        # self.display_fps.delete()
-        # self.pymunk_fps.delete()
+        # TODO : liberer plus proprement toutes les autres ressources
         self.close()
 
 
@@ -371,52 +353,44 @@ class SuikaWindow(pg.window.Window):
 
 
     def on_key_press(self, symbol, modifiers):
-        #print(f"key {symbol} was pressed")
-        if(symbol == pg.window.key.D):        # DEBUG
-            #utils.print_counters()
+        if(symbol == pg.window.key.D):              # DEBUG
             print(f"autoplayer enabled={self._autoplayer._enabled} autofire_on={self._autofire_on} rate={self._autoplayer.get_rate()}")
-
-        if(symbol == pg.window.key.ESCAPE):        # ESC ferme le jeu dans tous les cas
+        if(symbol == pg.window.key.ESCAPE):         # ESC ferme le jeu dans tous les cas
             self.end_application()
-        elif(self._is_gameover or symbol==pg.window.key.R):    # n'importe quelle touche relance une partie apres un gameover
+        elif(self._is_gameover or symbol==pg.window.key.R):    # relance une partie apres un gameover
             self.reset_game()
-        elif(symbol == pg.window.key.A):           # A controle l'autoplay
+        elif(symbol == pg.window.key.A):            # A controle l'autoplay
             self._autoplayer.toggle()
-        elif(symbol == pg.window.key.T):           # Mode machine à laver
-            self._countdown.update( deborde=False )
+        elif(symbol == pg.window.key.T):            # Mode machine à laver
+            self._countdown.reset( )
             self._bocal.tumble_once()
-        elif(symbol == pg.window.key.S):        # S secoue le bocal automatiquement
+        elif(symbol == pg.window.key.S):            # S secoue le bocal automatiquement
             self._bocal.shake_auto()
         elif(symbol == pg.window.key.SPACE):        # SPACE met en mode MOUSE_SHAKE
             self._bocal.shake_mouse()
             self.push_handlers( self._bocal.on_mouse_motion )
-        elif(symbol == pg.window.key.M):
+        elif(symbol == pg.window.key.M):            # deplace un fruit à la souris
             self.fruit_drag_start()
-        elif(symbol == pg.window.key.P):        # P met le jeu en pause
+        elif(symbol == pg.window.key.P):            # P met le jeu en pause
             self.toggle_pause()
-        elif(symbol == pg.window.key.G):        # G force un gameover en cours de partie
+        elif(symbol == pg.window.key.G):            # G force un gameover en cours de partie
             self.gameover()
-        elif(symbol == pg.window.key.B):        # Mode benchmark
+        elif(symbol == pg.window.key.B):            # Mode benchmark
             self.toggle_benchmark_mode()
-        else:
-            return pg.event.EVENT_UNHANDLED
-        return pg.event.EVENT_HANDLED
 
 
     def on_key_release(self, symbol, modifiers):
-        if(symbol == pg.window.key.SPACE):       # arrete la secousse manuelle
+        if(symbol == pg.window.key.SPACE):          # arrete la secousse manuelle
             self._bocal.shake_stop()
             self.pop_handlers()
-        elif(symbol == pg.window.key.S):       # arrete la secousse automatique
+        elif(symbol == pg.window.key.S):            # arrete la secousse automatique
             self._bocal.shake_stop()
-        elif(symbol == pg.window.key.M):
+        elif(symbol == pg.window.key.M):            # relache le fruit après un deplacement à la souris
             self.fruit_drag_stop()
-
 
 
     def on_mouse_press(self, x, y, button, modifiers):
         if( self._is_gameover ):
-            # relance une partie si la précédente est terminée
             self.reset_game()
         elif( (button & pg.window.mouse.LEFT) ):
             self.drop(x)

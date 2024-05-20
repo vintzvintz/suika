@@ -1,10 +1,6 @@
 
-import time
-import collections
-
+import time, collections
 import pyglet as pg
-import pymunk as pm
-
 from constants import *
 
 def now():
@@ -51,10 +47,12 @@ class CountDown(object):
             #print( "countdown start")
             self._start_time = now()  # ne remet pas à zero si déja en cours
         elif( not deborde ):
-            #debug
             #if( self._start_time ):
             #    print( "countdown stop")
             self._start_time = None
+
+    def reset(self):
+        self.update( False )
 
     def status(self):
         """ Renvoie un tuple (t, texte)
