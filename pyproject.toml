@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-suika = "suika_game.main:main"
+suika = "suika.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
