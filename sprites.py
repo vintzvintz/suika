@@ -33,9 +33,9 @@ _g_batch = pg.graphics.Batch()   # optimisation pour l'affichage
 class LineSprite( pg.shapes.Line ):
     """objet graphique de type ligne"""
     def __init__(self, a, b, color, thickness):
-        super().__init__( *a, *b, width=thickness, 
-            color=color, 
-            batch=batch(), 
+        super().__init__( *a, *b, thickness=thickness,
+            color=color,
+            batch=batch(),
             group=sprite_group(SPRITE_GROUP_GUI) )
         self.anchor_position = (0, 0)
 

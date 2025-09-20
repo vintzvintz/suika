@@ -162,14 +162,12 @@ class CollisionHelper(object):
 
         # collisions entre fruits en mode normal
         for kind in range(1, nb_fruits()+1):
-            h = space.add_collision_handler(kind, kind)
-            h.begin = lambda arbiter, space, data : self.collision_fruit(arbiter)
+            space.on_collision(kind, kind, begin=lambda arbiter, space, data : self.collision_fruit(arbiter))
 
         # collisions des fruits FIRST_DROP avec les fruits normaux ou le sol
-        h = space.add_wildcard_collision_handler( COLLISION_TYPE_FIRST_DROP )
-        h.begin = lambda arbiter, space, data: self.collision_first_drop(arbiter)
+        space.on_collision(COLLISION_TYPE_FIRST_DROP, None, begin=lambda arbiter, space, data: self.collision_first_drop(arbiter))
 
         # collisions avec maxline
-        h = space.add_wildcard_collision_handler( COLLISION_TYPE_MAXLINE )
-        h.begin = lambda arbiter, space, data : self.collision_maxline_begin(arbiter)
-        h.separate = lambda arbiter, space, data : self.collision_maxline_separate(arbiter)
+        space.on_collision(COLLISION_TYPE_MAXLINE, None,
+                          begin=lambda arbiter, space, data : self.collision_maxline_begin(arbiter),
+                          separate=lambda arbiter, space, data : self.collision_maxline_separate(arbiter))
