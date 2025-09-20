@@ -1,0 +1,18 @@
+[lint]
+# Allow star imports for constants modules - commonly used pattern in this codebase
+ignore = [
+    "F403",  # `from module import *` used; unable to detect undefined names
+    "F405",  # name may be undefined, or defined from star imports
+    "E701",  # Multiple statements on one line (colon) - common pattern in this codebase
+]
+
+# Auto-fix imports and other simple issues
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # isort
+]
+
+[lint.isort]
+known-first-party = ["suika"]
