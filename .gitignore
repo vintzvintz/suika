@@ -6,3 +6,8 @@ __pycache__
 .~lock.simu_shake.ods#
 
 /venv
+
+# Python package build artifacts
+*.egg-info/
+build/
+dist/
